@@ -17,6 +17,8 @@ import Orphanages from "./pages/Orphanages";
 import QRPage from "./pages/QRPage";
 import DisasterRequestForm from "./pages/DisasterRequestForm";
 import Tracking from "./pages/Tracking";
+import ExpiringItems from "./pages/Admin/ExpiringItems";
+
 
 // ------------------- AUTH -------------------
 import UserLogin from "./pages/Auth/UserLogin";
@@ -144,6 +146,14 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route 
+          path="/admin/expiring" 
+          element={
+            <ExpiringItems />
+            } 
+          />
+
 
           <Route
             path="/admin/orphanages"

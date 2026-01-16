@@ -11,19 +11,19 @@ import {
 } from "react-icons/fi";
 
 export default function AdminDashboard() {
-  const [expiringSoon, setExpiringSoon] = useState([]);
+  const [expiringCount, setExpiringCount] = useState(0);
 
   // -----------------------
-  // Load items expiring in next 30 days
+  // Load expiry count only
   // -----------------------
   useEffect(() => {
-    loadExpiryAlerts();
+    loadExpiryCount();
   }, []);
 
-  async function loadExpiryAlerts() {
+  async function loadExpiryCount() {
     try {
-      const res = await api.get("/expiry-alerts"); // hits /api/expiry-alerts
-      setExpiringSoon(res.data || []);
+      const res = await api.get("/expiry-alerts");
+      setExpiringCount(res.data?.length || 0);
     } catch (err) {
       console.error("❌ Error loading expiry alerts:", err);
     }
@@ -79,13 +79,13 @@ export default function AdminDashboard() {
             link="/admin/inventories"
           />
 
-          {/* NEW CARD: Expiring Soon */}
+          {/* ✅ FIXED: Expiring Soon → dedicated page */}
           <StatCard
             icon={<FiAlertTriangle size={35} />}
             label="Expiring Soon"
-            value={`${expiringSoon.length} item(s)`}
+            value={`${expiringCount} item(s)`}
             color="from-orange-400 to-orange-600"
-            link="/admin/inventories"
+            link="/admin/expiring"
           />
         </div>
 
@@ -93,6 +93,7 @@ export default function AdminDashboard() {
         <h2 className="text-2xl font-bold mt-12 mb-4 text-gray-800">
           Quick Access
         </h2>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <QuickLink
             label="Manage Donations"
@@ -125,58 +126,6 @@ export default function AdminDashboard() {
             icon={<FiTruck />}
           />
         </div>
-
-        {/* EXPIRY ALERT TABLE */}
-        {expiringSoon.length > 0 && (
-          <div className="mt-12 bg-white rounded-xl p-6 shadow-lg border border-red-100">
-            <h2 className="text-xl font-bold mb-4 text-red-600 flex items-center gap-2">
-              <FiAlertTriangle />
-              Items Expiring Within 30 Days
-            </h2>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-gray-100 text-gray-700">
-                  <tr>
-                    <th className="p-3 border">Product</th>
-                    <th className="p-3 border">Quantity</th>
-                    <th className="p-3 border">Unit</th>
-                    <th className="p-3 border">Expiry Date</th>
-                    <th className="p-3 border">Days Left</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {expiringSoon.map((item) => (
-                    <tr
-                      key={item.inventoryId}
-                      className="border-t hover:bg-red-50/40 transition"
-                    >
-                      <td className="p-3 border">{item.productName}</td>
-                      <td className="p-3 border">{item.quantity}</td>
-                      <td className="p-3 border">{item.unit}</td>
-                      <td className="p-3 border">
-                        {item.expiryDate
-                          ? new Date(item.expiryDate).toLocaleDateString(
-                              "en-GB"
-                            )
-                          : "—"}
-                      </td>
-                      <td className="p-3 border font-bold text-red-600">
-                        {item.daysLeft} day(s)
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <p className="text-sm text-gray-500 mt-3">
-              Suggestion: Prioritise dispatching these items to orphanages
-              before they expire.
-            </p>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -206,14 +155,14 @@ function StatCard({ icon, label, value, color, link }) {
 }
 
 /* ------------------------------------------------ */
-/* QUICK ACCESS COMPONENT */
+/* QUICK LINK */
 /* ------------------------------------------------ */
 function QuickLink({ label, to, icon }) {
   return (
     <a href={to}>
       <div className="bg-white p-6 rounded-xl shadow hover:shadow-xl border border-gray-200 transition transform hover:-translate-y-1">
         <div className="flex items-center gap-3 text-gray-700">
-          <span className="text-gray-800 text-xl">{icon}</span>
+          <span className="text-xl">{icon}</span>
           <span className="font-semibold">{label}</span>
         </div>
       </div>

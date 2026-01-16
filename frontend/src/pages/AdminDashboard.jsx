@@ -9,8 +9,11 @@ export default function AdminDashboard() {
     requests: [],
   });
 
+  const [expiryAlerts, setExpiryAlerts] = useState([]);
+
   useEffect(() => {
     loadAll();
+    loadExpiryAlerts();
   }, []);
 
   async function loadAll() {
@@ -31,6 +34,15 @@ export default function AdminDashboard() {
     }
   }
 
+  async function loadExpiryAlerts() {
+    try {
+      const res = await api.get("/expiry-alerts");
+      setExpiryAlerts(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
   async function approve(type, id) {
     await api.put(`/admin/actions/approve`, { type, id });
     loadAll();
@@ -43,18 +55,54 @@ export default function AdminDashboard() {
 
   return (
     <div className="p-6">
-
       <h1 className="text-3xl font-bold mb-6 text-center text-yellow-600">
         Admin Control Panel
       </h1>
 
-      {/* Cards Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
         <SummaryCard label="Pending Donations" count={pending.donations.length} color="blue" />
         <SummaryCard label="Pending Products" count={pending.products.length} color="purple" />
         <SummaryCard label="Orphanage Approvals" count={pending.orphanages.length} color="green" />
         <SummaryCard label="Disaster Requests" count={pending.requests.length} color="red" />
+        <SummaryCard label="Expiry Alerts" count={expiryAlerts.length} color="yellow" />
       </div>
+
+      {/* Expiry Alerts Section */}
+      {expiryAlerts.length > 0 && (
+        <div className="mb-10">
+          <h2 className="text-2xl font-semibold mb-4 text-red-600">
+            ⚠️ Items Expiring in Next 30 Days
+          </h2>
+
+          <div className="bg-white shadow rounded-lg">
+            <table className="w-full table-auto text-left">
+              <thead className="bg-red-100">
+                <tr>
+                  <th className="p-3">Product</th>
+                  <th className="p-3">Quantity</th>
+                  <th className="p-3">Unit</th>
+                  <th className="p-3">Expiry Date</th>
+                  <th className="p-3">Days Left</th>
+                </tr>
+              </thead>
+              <tbody>
+                {expiryAlerts.map((item) => (
+                  <tr key={item.inventoryId} className="border-t">
+                    <td className="p-3 font-semibold">{item.productName}</td>
+                    <td className="p-3">{item.quantity}</td>
+                    <td className="p-3">{item.unit}</td>
+                    <td className="p-3">{item.expiryDate}</td>
+                    <td className="p-3 text-red-600 font-bold">
+                      {item.daysLeft}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Approval Sections */}
       <Section title="Pending Donations" data={pending.donations} type="donation" approve={approve} reject={reject} />
@@ -72,6 +120,7 @@ function SummaryCard({ label, count, color }) {
     purple: "bg-purple-100 text-purple-700",
     green: "bg-green-100 text-green-700",
     red: "bg-red-100 text-red-700",
+    yellow: "bg-yellow-100 text-yellow-700",
   };
 
   return (
@@ -101,29 +150,37 @@ function Section({ title, data, type, approve, reject }) {
           </thead>
 
           <tbody>
-            {data.map((item) => (
-              <tr key={item.id} className="border-t hover:bg-gray-50">
-                <td className="p-3 font-semibold">{item.id || item.donationId || item.productId || item.orphanageId}</td>
-                <td className="p-3">{JSON.stringify(item)}</td>
+            {data.map((item) => {
+              const id =
+                item.id ||
+                item.donationId ||
+                item.productId ||
+                item.orphanageId ||
+                item.requestId;
 
-                <td className="p-3 flex gap-2">
-                  <button
-                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-                    onClick={() => approve(type, item.id || item.donationId || item.productId || item.orphanageId)}
-                  >
-                    Approve
-                  </button>
-
-                  <button
-                    className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-                    onClick={() => reject(type, item.id || item.donationId || item.productId || item.orphanageId)}
-                  >
-                    Reject
-                  </button>
-                </td>
-
-              </tr>
-            ))}
+              return (
+                <tr key={id} className="border-t hover:bg-gray-50">
+                  <td className="p-3 font-semibold">{id}</td>
+                  <td className="p-3 text-sm text-gray-600">
+                    {JSON.stringify(item)}
+                  </td>
+                  <td className="p-3 flex gap-2">
+                    <button
+                      className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                      onClick={() => approve(type, id)}
+                    >
+                      Approve
+                    </button>
+                    <button
+                      className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                      onClick={() => reject(type, id)}
+                    >
+                      Reject
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
