@@ -1,0 +1,2 @@
+Donation frontend - extract and run npm install && npm run dev
+Ensure backend runs on http://localhost:3000

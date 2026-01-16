@@ -1,0 +1,48 @@
+./
+├── frontend-structure.txt
+├── index.html
+├── package-lock.json
+├── package.json
+├── postcss.config.js
+├── public/
+│   └── placeholder.txt
+├── README.md
+├── src/
+│   ├── api.js
+│   ├── App.jsx
+│   ├── components/
+│   │   └── Nav.jsx
+│   ├── context/
+│   │   └── AuthContext.jsx
+│   ├── index.css
+│   ├── main.jsx
+│   ├── pages/
+│   │   ├── Admin/
+│   │   │   ├── AdminDashboard.jsx
+│   │   │   ├── AdminDisasters.jsx
+│   │   │   ├── AdminDonations.jsx
+│   │   │   ├── AdminInventories.jsx
+│   │   │   ├── AdminNav.jsx
+│   │   │   ├── AdminOrphanages.jsx
+│   │   │   ├── AdminProducts.jsx
+│   │   │   ├── AdminRedirect.jsx
+│   │   │   └── AdminRequests.jsx
+│   │   ├── AdminDashboard.jsx
+│   │   ├── Auth/
+│   │   │   ├── AdminLogin.jsx
+│   │   │   ├── UserLogin.jsx
+│   │   │   └── UserRegister.jsx
+│   │   ├── Dashboard.jsx
+│   │   ├── DisasterRequestForm.jsx
+│   │   ├── Disasters.jsx
+│   │   ├── Donations.jsx
+│   │   ├── Donors.jsx
+│   │   ├── Inventory.jsx
+│   │   ├── Orphanages.jsx
+│   │   ├── Products.jsx
+│   │   ├── QRPage.jsx
+│   │   └── Tracking.jsx
+│   └── ProtectedRoute.jsx
+└── tailwind.config.js
+
+8 directories, 38 files
