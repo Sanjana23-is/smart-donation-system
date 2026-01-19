@@ -2,10 +2,10 @@
 // Import dependencies
 // ------------------------------------------
 const express = require('express');
-const bodyParser = require('body-parser');
 const dotenv = require('dotenv');
 const mysql = require('mysql2');
 const cors = require('cors');
+const path = require("path");
 
 // Load environment variables
 dotenv.config();
@@ -39,9 +39,12 @@ const db = mysql
 // Initialize Express App
 // ------------------------------------------
 const app = express();
-app.use(bodyParser.json());
 app.use(cors());
 
+// ✅ IMPORTANT: use express parsers (NOT body-parser)
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // ------------------------------------------
 // USER ROUTES
 // ------------------------------------------
@@ -51,15 +54,12 @@ const donatedProductsRouter = require('./routes/donatedProducts');
 const productCatalogRouter = require('./routes/productCatalog');
 const inventoriesRouter = require('./routes/inventories');
 const productInventoryTrackingRouter = require('./routes/productInventoryTracking');
-// const productTrackingStatusRouter = require('./routes/productTrackingStatus');
 const disastersRouter = require('./routes/disasters');
 const orphanagesRouter = require('./routes/orphanages');
 const disasterRequestsRouter = require('./routes/disasterRequests');
 const authRouter = require('./routes/auth');
 const redirectsRouter = require('./routes/redirects');
 const trackingRoutes = require('./routes/tracking');
-
-// 🔔 NEW: expiry alerts route
 const expiryAlertsRouter = require('./routes/expiryAlerts');
 
 // ------------------------------------------
@@ -71,30 +71,19 @@ const adminActionsRouter = require('./routes/adminActions');
 // ------------------------------------------
 // USE ROUTES
 // ------------------------------------------
-
-// User routes
 app.use('/api/donors', donorsRouter);
 app.use('/api/donations', donationsRouter);
 app.use('/api/donated-products', donatedProductsRouter);
 app.use('/api/product-catalog', productCatalogRouter);
 app.use('/api/inventories', inventoriesRouter);
 app.use('/api/product-inventory-tracking', productInventoryTrackingRouter);
-// app.use('/api/product-tracking-status', productTrackingStatusRouter);
 app.use('/api/disasters', disastersRouter);
 app.use('/api/orphanages', orphanagesRouter);
 app.use('/api/redirect', redirectsRouter);
 app.use('/api/tracking', trackingRoutes);
-
-// Disaster requests
 app.use('/api/disaster-requests', disasterRequestsRouter);
-
-// Auth
 app.use('/api/auth', authRouter);
-
-// 🔔 NEW: expiry alerts (items expiring in next 30 days)
 app.use('/api/expiry-alerts', expiryAlertsRouter);
-
-// Admin routes
 app.use('/api/admin', adminAuthRouter);
 app.use('/api/admin/actions', adminActionsRouter);
 
@@ -113,5 +102,4 @@ app.listen(port, () => {
   console.log(`🚀 Server listening on port ${port}`);
 });
 
-// Export DB pool
 module.exports = db;
