@@ -1,147 +1,133 @@
-// backend/routes/donatedProducts.js
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const upload = require("../middleware/upload");
+const { analyzeProduct } = require("../services/aiService");
 
-// Generate UID function (used on product add)
+// UID generator
 function generateUID() {
   return "PROD-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
 }
 
-// Add a donated product (user)
-// Add a donated product (user)
-router.post("/", async (req, res) => {
-  try {
-    const {
-      donorId,
-      productName,
-      category,
-      quantity,
-      unit,
-      perishable,        // NEW
-      manufactureDate,   // NEW
-      expiryDate         // NEW
-    } = req.body;
-
-    if (!donorId || !productName || !category || !quantity || !unit) {
-      return res.status(400).json({ error: "All fields are required." });
-    }
-
-    // perishable flag -> 0 or 1
-    const isPerishable = perishable ? 1 : 0;
-
-    // If perishable, manufacture + expiry are mandatory
-    if (isPerishable && (!manufactureDate || !expiryDate)) {
-      return res
-        .status(400)
-        .json({ error: "Manufacture and expiry date required for perishable products." });
-    }
-
-    const uid = generateUID();
-    const barcode = uid;
-
-    const [result] = await db.query(
-      `INSERT INTO donatedProducts 
-       (donorId, productName, category, quantity, unit, status, uid, barcode,
-        perishable, manufactureDate, expiryDate)
-       VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
-      [
+/**
+ * ADD DONATED PRODUCT
+ * - Accepts up to 3 images
+ * - AI gives suggestion only
+ * - Admin approval is final
+ */
+router.post(
+  "/",
+  upload.array("item_images", 3), // 🔴 MUST MATCH POSTMAN KEY
+  async (req, res) => {
+    try {
+      const {
         donorId,
         productName,
         category,
         quantity,
         unit,
-        uid,
-        barcode,
-        isPerishable,
-        isPerishable ? manufactureDate : null,
-        isPerishable ? expiryDate : null,
-      ]
-    );
+        perishable,
+        manufactureDate,
+        expiryDate,
+      } = req.body;
 
-    res.status(201).json({
-      message: "Product added successfully",
-      productId: result.insertId,
-      uid,
-      barcode,
-    });
-  } catch (err) {
-    console.error("❌ ERROR ADDING DONATED PRODUCT:", err);
-    res.status(500).json({ error: err.message });
+      // ---------------- VALIDATIONS ----------------
+      if (!donorId || !productName || !category || !quantity || !unit) {
+        return res.status(400).json({
+          error: "Required fields missing",
+        });
+      }
+
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({
+          error: "At least one image is required",
+        });
+      }
+
+      if (req.files.length > 3) {
+        return res.status(400).json({
+          error: "Maximum 3 images allowed",
+        });
+      }
+
+      const isPerishable = Number(perishable) === 1;
+
+      if (isPerishable && !expiryDate) {
+        return res.status(400).json({
+          error: "Expiry date is required for perishable items",
+        });
+      }
+
+      // ---------------- IMAGE PATHS ----------------
+      const imagePaths = req.files.map((file) => file.path);
+
+      // ---------------- AI ANALYSIS ----------------
+      const aiResult = analyzeProduct({
+        imagePaths,
+        category,
+        perishable: isPerishable,
+        expiryDate: expiryDate || null,
+      });
+      // aiResult = { status: "approved/rejected/review", confidence: 0-100, reason }
+
+      const uid = generateUID();
+      const barcode = uid;
+
+      // ---------------- DB INSERT ----------------
+      const [result] = await db.query(
+        `
+        INSERT INTO donatedProducts (
+          donorId,
+          productName,
+          category,
+          quantity,
+          unit,
+          status,
+          uid,
+          barcode,
+          perishable,
+          manufactureDate,
+          expiryDate,
+          item_image,
+          ai_status,
+          ai_confidence
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          donorId,
+          productName,
+          category,
+          quantity,
+          unit,
+          "pending",                 // 🔒 ADMIN DECIDES
+          uid,
+          barcode,
+          isPerishable,
+          manufactureDate || null,
+          expiryDate || null,
+          imagePaths.join(","),      // multiple images stored
+          aiResult.status,            // AI suggestion
+          aiResult.confidence,        // AI confidence
+        ]
+      );
+
+      // ---------------- RESPONSE ----------------
+      return res.status(201).json({
+        message: "Product submitted successfully",
+        productId: result.insertId,
+        ai: aiResult,
+        finalStatus: "pending (admin review required)",
+      });
+
+    } catch (err) {
+      console.error("❌ ERROR ADDING DONATED PRODUCT:", err);
+      return res.status(500).json({
+        error: "Internal server error",
+        details: err.message,
+      });
+    }
   }
-});
-
-
-// List donated products
-router.get("/", async (req, res) => {
-  try {
-    const [rows] = await db.query(
-      "SELECT * FROM donatedProducts ORDER BY productId DESC"
-    );
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ✅ Approve donated product -> update expiryDate + insert into inventories
-// ✅ Approve donated product -> insert into inventories with perishable + dates
-router.put("/:id/approve", async (req, res) => {
-  try {
-    const pid = req.params.id;
-
-    // 1) Mark as approved (we already have manufacture/expiry from donor)
-    await db.query(
-      "UPDATE donatedProducts SET status='approved' WHERE productId=?",
-      [pid]
-    );
-
-    // 2) Fetch product
-    const [rows] = await db.query(
-      "SELECT * FROM donatedProducts WHERE productId=?",
-      [pid]
-    );
-    const p = rows[0];
-    if (!p) return res.status(404).json({ error: "Product not found" });
-
-    // 3) Insert into inventories, carry expiry/perishable forward
-    await db.query(
-      `INSERT INTO inventories
-       (sourceType, productId, productName, quantity, unit, uid, location, status,
-        perishable, manufactureDate, expiryDate)
-       VALUES ('product', ?, ?, ?, ?, ?, 'Main Warehouse', 'received',
-               ?, ?, ?)`,
-      [
-        p.productId,
-        p.productName,
-        p.quantity,
-        p.unit,
-        p.uid,
-        p.perishable || 0,
-        p.manufactureDate || null,
-        p.expiryDate || null,
-      ]
-    );
-
-    res.json({ message: "Product approved & added to inventory" });
-  } catch (err) {
-    console.error("❌ ERROR APPROVING DONATED PRODUCT:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Reject product
-router.put("/:id/reject", async (req, res) => {
-  try {
-    await db.query(
-      "UPDATE donatedProducts SET status='rejected' WHERE productId=?",
-      [req.params.id]
-    );
-    res.json({ message: "Product rejected" });
-  } catch (err) {
-    console.error("❌ ERROR REJECTING DONATED PRODUCT:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
+);
 
 module.exports = router;
