@@ -6,11 +6,13 @@ const db = require("../db");
 router.get("/", async (req, res) => {
   try {
     const [rows] = await db.query("SELECT * FROM donors ORDER BY donorId DESC");
-    res.json(rows);
+    res.json(rows || []);
   } catch (err) {
+    console.error("❌ DONORS ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // Add donor
 router.post("/", async (req, res) => {

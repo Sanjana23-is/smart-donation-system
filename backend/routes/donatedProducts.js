@@ -1,133 +1,98 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
-const upload = require("../middleware/upload");
+const multer = require("multer");
+const fs = require("fs");
 const { analyzeProduct } = require("../services/aiService");
+const parseImages = require("../utils/imageParser");
 
-// UID generator
-function generateUID() {
-  return "PROD-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
-}
+const uploadDir = "uploads";
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 
-/**
- * ADD DONATED PRODUCT
- * - Accepts up to 3 images
- * - AI gives suggestion only
- * - Admin approval is final
- */
-router.post(
-  "/",
-  upload.array("item_images", 3), // 🔴 MUST MATCH POSTMAN KEY
-  async (req, res) => {
-    try {
-      const {
-        donorId,
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
+});
+
+const upload = multer({ storage });
+
+// ✅ GET ALL PRODUCTS
+router.get("/", async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      "SELECT * FROM donatedProducts ORDER BY donatedAt DESC"
+    );
+
+    const result = rows.map((r) => ({
+      ...r,
+      item_image: parseImages(r.item_image),
+    }));
+
+    res.json(result);
+  } catch (err) {
+    console.error("❌ FETCH PRODUCTS ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ ADD PRODUCT + AI ANALYSIS
+router.post("/", upload.array("item_images", 3), async (req, res) => {
+  try {
+    const {
+      donorId,
+      productName,
+      category,
+      quantity,
+      unit,
+      perishable,
+      manufactureDate,
+      expiryDate,
+    } = req.body;
+
+    const images = req.files ? req.files.map((f) => f.path) : [];
+    const uid = "PROD-" + Date.now();
+
+    // ✅ AI ANALYSIS
+    const aiResult = analyzeProduct({
+      imagePaths: images,
+      category,
+      perishable: perishable === "true",
+      expiryDate,
+    });
+
+    await db.query(
+      `INSERT INTO donatedProducts
+      (donorId, productName, category, quantity, unit, perishable,
+       manufactureDate, expiryDate, item_image, uid,
+       status, ai_status, ai_confidence, ai_reason)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        donorId || null,
         productName,
         category,
         quantity,
         unit,
-        perishable,
-        manufactureDate,
-        expiryDate,
-      } = req.body;
+        perishable === "true" ? 1 : 0,
+        manufactureDate || null,
+        expiryDate || null,
+        JSON.stringify(images),
+        uid,
+        "pending",
+        aiResult.status,
+        aiResult.confidence,
+        aiResult.reason,
+      ]
+    );
 
-      // ---------------- VALIDATIONS ----------------
-      if (!donorId || !productName || !category || !quantity || !unit) {
-        return res.status(400).json({
-          error: "Required fields missing",
-        });
-      }
-
-      if (!req.files || req.files.length === 0) {
-        return res.status(400).json({
-          error: "At least one image is required",
-        });
-      }
-
-      if (req.files.length > 3) {
-        return res.status(400).json({
-          error: "Maximum 3 images allowed",
-        });
-      }
-
-      const isPerishable = Number(perishable) === 1;
-
-      if (isPerishable && !expiryDate) {
-        return res.status(400).json({
-          error: "Expiry date is required for perishable items",
-        });
-      }
-
-      // ---------------- IMAGE PATHS ----------------
-      const imagePaths = req.files.map((file) => file.path);
-
-      // ---------------- AI ANALYSIS ----------------
-      const aiResult = analyzeProduct({
-        imagePaths,
-        category,
-        perishable: isPerishable,
-        expiryDate: expiryDate || null,
-      });
-      // aiResult = { status: "approved/rejected/review", confidence: 0-100, reason }
-
-      const uid = generateUID();
-      const barcode = uid;
-
-      // ---------------- DB INSERT ----------------
-      const [result] = await db.query(
-        `
-        INSERT INTO donatedProducts (
-          donorId,
-          productName,
-          category,
-          quantity,
-          unit,
-          status,
-          uid,
-          barcode,
-          perishable,
-          manufactureDate,
-          expiryDate,
-          item_image,
-          ai_status,
-          ai_confidence
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-        [
-          donorId,
-          productName,
-          category,
-          quantity,
-          unit,
-          "pending",                 // 🔒 ADMIN DECIDES
-          uid,
-          barcode,
-          isPerishable,
-          manufactureDate || null,
-          expiryDate || null,
-          imagePaths.join(","),      // multiple images stored
-          aiResult.status,            // AI suggestion
-          aiResult.confidence,        // AI confidence
-        ]
-      );
-
-      // ---------------- RESPONSE ----------------
-      return res.status(201).json({
-        message: "Product submitted successfully",
-        productId: result.insertId,
-        ai: aiResult,
-        finalStatus: "pending (admin review required)",
-      });
-
-    } catch (err) {
-      console.error("❌ ERROR ADDING DONATED PRODUCT:", err);
-      return res.status(500).json({
-        error: "Internal server error",
-        details: err.message,
-      });
-    }
+    res.json({
+      message: "Product submitted successfully",
+      uid,
+      aiResult,
+    });
+  } catch (err) {
+    console.error("❌ ADD PRODUCT ERROR:", err);
+    res.status(500).json({ error: err.message });
   }
-);
+});
 
 module.exports = router;
