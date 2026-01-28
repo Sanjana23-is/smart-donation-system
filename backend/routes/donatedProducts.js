@@ -36,6 +36,8 @@ router.get("/", async (req, res) => {
 });
 
 // ✅ ADD PRODUCT + AI ANALYSIS
+// routes/donatedProducts.js
+
 router.post("/", upload.array("item_images", 3), async (req, res) => {
   try {
     const {
@@ -49,6 +51,10 @@ router.post("/", upload.array("item_images", 3), async (req, res) => {
       expiryDate,
     } = req.body;
 
+    if (!productName || !category || !quantity || !unit) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
     const images = req.files ? req.files.map((f) => f.path) : [];
     const uid = "PROD-" + Date.now();
 
@@ -59,6 +65,9 @@ router.post("/", upload.array("item_images", 3), async (req, res) => {
       perishable: perishable === "true",
       expiryDate,
     });
+
+    // ✅ ALWAYS pending for admin review (important)
+    const status = "pending";
 
     await db.query(
       `INSERT INTO donatedProducts
@@ -77,7 +86,7 @@ router.post("/", upload.array("item_images", 3), async (req, res) => {
         expiryDate || null,
         JSON.stringify(images),
         uid,
-        "pending",
+        status,
         aiResult.status,
         aiResult.confidence,
         aiResult.reason,
@@ -85,7 +94,7 @@ router.post("/", upload.array("item_images", 3), async (req, res) => {
     );
 
     res.json({
-      message: "Product submitted successfully",
+      message: "Product submitted. AI analyzed + Admin review pending.",
       uid,
       aiResult,
     });
@@ -94,5 +103,6 @@ router.post("/", upload.array("item_images", 3), async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 module.exports = router;

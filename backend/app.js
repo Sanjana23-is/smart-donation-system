@@ -26,6 +26,8 @@ app.use("/api/redirect", require("./routes/redirects"));
 app.use("/api/expiry-alerts", require("./routes/expiryAlerts"));
 app.use("/api/disasters", require("./routes/disasters"));
 app.use("/api/orphanages", require("./routes/orphanages"));
+app.use("/api/dashboard", require("./routes/dashboard"));
+
 
 // Default route
 app.get("/", (req, res) => {
