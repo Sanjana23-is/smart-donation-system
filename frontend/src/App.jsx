@@ -17,8 +17,8 @@ import Orphanages from "./pages/Orphanages";
 import QRPage from "./pages/QRPage";
 import DisasterRequestForm from "./pages/DisasterRequestForm";
 import Tracking from "./pages/Tracking";
+import ItemDonation from "./pages/ItemDonation";
 import ExpiringItems from "./pages/Admin/ExpiringItems";
-
 
 // ------------------- AUTH -------------------
 import UserLogin from "./pages/Auth/UserLogin";
@@ -42,7 +42,7 @@ import ProtectedRoute from "./ProtectedRoute";
 export default function App() {
   const [current, setCurrent] = useState("Dashboard");
 
-  // USER PAGE SWITCHER
+  // USER PAGE SWITCHER (DASHBOARD ONLY)
   function renderUserPages() {
     switch (current) {
       case "Donors":
@@ -57,7 +57,7 @@ export default function App() {
       case "Disasters":
         return <Disasters />;
 
-      case "RequestDisaster":    // ⭐ User disaster request form
+      case "RequestDisaster":
         return <DisasterRequestForm />;
 
       case "Orphanages":
@@ -66,9 +66,8 @@ export default function App() {
       case "QR":
         return <QRPage />;
 
-        case "Track":
-  return <Tracking />;
-
+      case "Track":
+        return <Tracking />;
 
       default:
         return <Dashboard />;
@@ -99,15 +98,26 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-{/* ---------------- USER TRACKING PAGE ---------------- */}
-<Route
-  path="/track"
-  element={
-    <ProtectedRoute role="user">
-      <Tracking />
-    </ProtectedRoute>
-  }
-/>
+
+          {/* ---------------- USER TRACKING PAGE ---------------- */}
+          <Route
+            path="/track"
+            element={
+              <ProtectedRoute role="user">
+                <Tracking />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* ---------------- USER ITEM DONATION PAGE ---------------- */}
+          <Route
+            path="/donate-items"
+            element={
+              <ProtectedRoute role="user">
+                <ItemDonation />
+              </ProtectedRoute>
+            }
+          />
 
           {/* ---------------- ADMIN DASHBOARD ---------------- */}
           <Route
@@ -147,13 +157,10 @@ export default function App() {
             }
           />
 
-          <Route 
-          path="/admin/expiring" 
-          element={
-            <ExpiringItems />
-            } 
+          <Route
+            path="/admin/expiring"
+            element={<ExpiringItems />}
           />
-
 
           <Route
             path="/admin/orphanages"
@@ -163,7 +170,8 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-<Route path="/admin" element={<Navigate to="/admin/dashboard" />} />
+
+          <Route path="/admin" element={<Navigate to="/admin/dashboard" />} />
 
           <Route
             path="/admin/disasters"
@@ -182,6 +190,7 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
           <Route path="/admin/redirect" element={<AdminRedirect />} />
 
           {/* ---------------- DEFAULT ROUTE ---------------- */}

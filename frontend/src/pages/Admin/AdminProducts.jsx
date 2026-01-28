@@ -1,207 +1,179 @@
 import React, { useEffect, useState } from "react";
 import api from "../../api";
-import { FiSearch, FiCheck, FiX, FiClock } from "react-icons/fi";
 
 export default function AdminProducts() {
-  const [list, setList] = useState([]);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const ITEMS_PER_PAGE = 8;
-  const [page, setPage] = useState(1);
+  const [showModal, setShowModal] = useState(false);
+  const [actionType, setActionType] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [remark, setRemark] = useState("");
 
   useEffect(() => {
-    load();
+    loadProducts();
   }, []);
 
-  async function load() {
-    const res = await api.get("/donated-products");
-    setList(res.data);
+  async function loadProducts() {
+    try {
+      const res = await api.get("/admin/actions/pending-products");
+      setProducts(res.data || []);
+    } catch (err) {
+      console.error("❌ Load products error:", err);
+      alert("Failed to load products");
+    } finally {
+      setLoading(false);
+    }
   }
 
-  async function approve(id) {
-    await api.put(`/donated-products/${id}/approve`);
-    load();
+  function getImage(img) {
+    if (!img) return null;
+    try {
+      const parsed = JSON.parse(img);
+      return Array.isArray(parsed) ? parsed[0] : null;
+    } catch {
+      return img;
+    }
   }
 
-  async function reject(id) {
-    await api.put(`/donated-products/${id}/reject`);
-    load();
-  }
-
-  // FORMAT DATE TO dd/mm/yyyy
-  const formatDate = (dateString) => {
-    if (!dateString) return "—";
-    const date = new Date(dateString);
-    if (isNaN(date)) return "—";
-
-    const d = String(date.getDate()).padStart(2, "0");
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const y = date.getFullYear();
-    return `${d}/${m}/${y}`;
-  };
-
-  const perishableText = (val) => (val ? "Yes" : "No");
-
-  const statusBadge = (status) => {
-    if (status === "approved")
-      return (
-        <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 font-semibold flex items-center gap-1">
-          <FiCheck /> Approved
-        </span>
+  async function handleDecision() {
+    try {
+      await api.put(
+        `/admin/actions/product/${selectedProduct.productId}/decision`,
+        {
+          decision: actionType,
+          adminRemark: remark,
+        }
       );
 
-    if (status === "rejected")
-      return (
-        <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 font-semibold flex items-center gap-1">
-          <FiX /> Rejected
-        </span>
-      );
-
-    return (
-      <span className="px-3 py-1 rounded-full bg-yellow-100 text-yellow-700 font-semibold flex items-center gap-1">
-        <FiClock /> Pending
-      </span>
-    );
-  };
-
-  // FILTER + SEARCH
-  const filtered = list.filter((p) => {
-    return (
-      (statusFilter === "all" || p.status === statusFilter) &&
-      (p.productName.toLowerCase().includes(search.toLowerCase()) ||
-        p.category.toLowerCase().includes(search.toLowerCase()))
-    );
-  });
-
-  // PAGINATION
-  const start = (page - 1) * ITEMS_PER_PAGE;
-  const paginated = filtered.slice(start, start + ITEMS_PER_PAGE);
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+      alert(`Product ${actionType}`);
+      setShowModal(false);
+      loadProducts();
+    } catch (err) {
+      console.error(err);
+      alert("Action failed");
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 p-8">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">
-        📦 Manage Product Donations
-      </h1>
+    <div className="min-h-screen p-6 bg-gray-100">
+      <h2 className="text-2xl font-bold mb-6">🤖 AI Product Review Panel</h2>
 
-      {/* SEARCH + FILTER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-2 bg-white shadow p-2 rounded-lg w-full md:w-1/3 border">
-          <FiSearch className="text-gray-600" />
-          <input
-            type="text"
-            placeholder="Search product or category…"
-            className="w-full outline-none"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
-        <select
-          className="p-2 bg-white rounded-lg shadow border"
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="all">All</option>
-          <option value="pending">Pending</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-        </select>
-      </div>
-
-      {/* TABLE */}
-      <div className="bg-white rounded-xl shadow-lg border overflow-x-auto">
-        <table className="w-full text-left">
-          <thead className="bg-gray-100 border-b">
-            <tr className="text-gray-700 text-sm font-semibold">
-              <th className="p-4">Product</th>
-              <th className="p-4">Category</th>
-              <th className="p-4">Quantity</th>
-              <th className="p-4">Unit</th>
-              <th className="p-4">Perishable</th>
-              <th className="p-4">Mfg Date</th>
-              <th className="p-4">Expiry Date</th>
-              <th className="p-4">Status</th>
-              <th className="p-4">Actions</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {paginated.map((p) => (
-              <tr key={p.productId} className="border-b hover:bg-gray-50 transition">
-                <td className="p-4 font-medium">{p.productName}</td>
-                <td className="p-4">{p.category}</td>
-                <td className="p-4">{p.quantity}</td>
-                <td className="p-4">{p.unit}</td>
-
-                {/* NEW COLUMNS: READ ONLY */}
-                <td className="p-4">{perishableText(p.perishable)}</td>
-                <td className="p-4">{formatDate(p.manufactureDate)}</td>
-                <td className="p-4">{formatDate(p.expiryDate)}</td>
-
-                <td className="p-4">{statusBadge(p.status)}</td>
-
-                <td className="p-4">
-                  {p.status === "pending" ? (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => approve(p.productId)}
-                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg shadow transition flex items-center gap-1"
-                      >
-                        <FiCheck /> Approve
-                      </button>
-
-                      <button
-                        onClick={() => reject(p.productId)}
-                        className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg shadow transition flex items-center gap-1"
-                      >
-                        <FiX /> Reject
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="text-gray-400 italic">No actions</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-
-            {paginated.length === 0 && (
+      {loading ? (
+        <p>Loading...</p>
+      ) : products.length === 0 ? (
+        <p>No pending products.</p>
+      ) : (
+        <div className="overflow-x-auto bg-white shadow-xl rounded-xl">
+          <table className="w-full text-left">
+            <thead className="bg-gray-200">
               <tr>
-                <td colSpan="9" className="p-6 text-center text-gray-500">
-                  No products found.
-                </td>
+                <th className="p-3">Product</th>
+                <th className="p-3">Category</th>
+                <th className="p-3">Image</th>
+                <th className="p-3">AI Status</th>
+                <th className="p-3">Confidence</th>
+                <th className="p-3">Actions</th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
 
-      {/* PAGINATION */}
-      <div className="flex justify-center items-center gap-4 mt-6">
-        <button
-          disabled={page === 1}
-          onClick={() => setPage(page - 1)}
-          className="px-4 py-2 bg-gray-300 rounded-lg disabled:opacity-40"
-        >
-          Prev
-        </button>
+            <tbody>
+              {products.map((p) => {
+                const img = getImage(p.item_image);
 
-        <span className="font-semibold">
-          {page} / {totalPages}
-        </span>
+                return (
+                  <tr key={p.productId} className="border-t">
+                    <td className="p-3">{p.productName}</td>
+                    <td className="p-3">{p.category || "—"}</td>
 
-        <button
-          disabled={page === totalPages}
-          onClick={() => setPage(page + 1)}
-          className="px-4 py-2 bg-gray-300 rounded-lg disabled:opacity-40"
-        >
-          Next
-        </button>
-      </div>
+                    <td className="p-3">
+                      {img ? (
+                        <img
+                          src={`http://localhost:3000/uploads/${img}`}
+                          className="w-12 h-12 rounded object-cover"
+                        />
+                      ) : (
+                        "No Image"
+                      )}
+                    </td>
+
+                    <td className="p-3">
+                      <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded">
+                        {p.ai_status}
+                      </span>
+                    </td>
+
+                    <td className="p-3 font-semibold">
+                      {p.ai_confidence
+                        ? Math.round(p.ai_confidence * 100) + "%"
+                        : "0%"}
+                    </td>
+
+                    <td className="p-3 flex gap-2">
+                      <button
+                        className="bg-green-600 text-white px-3 py-1 rounded"
+                        onClick={() => {
+                          setActionType("approved");
+                          setSelectedProduct(p);
+                          setShowModal(true);
+                        }}
+                      >
+                        Approve
+                      </button>
+
+                      <button
+                        className="bg-red-600 text-white px-3 py-1 rounded"
+                        onClick={() => {
+                          setActionType("rejected");
+                          setSelectedProduct(p);
+                          setShowModal(true);
+                        }}
+                      >
+                        Reject
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center">
+          <div className="bg-white p-6 rounded-xl w-96 shadow-xl">
+            <h2 className="text-lg font-bold mb-3">
+              {actionType === "approved" ? "Approve Product" : "Reject Product"}
+            </h2>
+
+            <textarea
+              className="w-full border p-2 rounded mb-4"
+              placeholder="Admin remark (optional)"
+              value={remark}
+              onChange={(e) => setRemark(e.target.value)}
+            />
+
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-3 py-1 bg-gray-400 text-white rounded"
+                onClick={() => setShowModal(false)}
+              >
+                Cancel
+              </button>
+
+              <button
+                className={`px-3 py-1 rounded text-white ${
+                  actionType === "approved" ? "bg-green-600" : "bg-red-600"
+                }`}
+                onClick={handleDecision}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

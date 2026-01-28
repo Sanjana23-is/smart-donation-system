@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
 import api from "../../api";
-
 import { FiSearch, FiCheck, FiX, FiClock } from "react-icons/fi";
 
 export default function AdminDonations() {
   const [donations, setDonations] = useState([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const ITEMS_PER_PAGE = 8;
   const [page, setPage] = useState(1);
@@ -16,30 +17,64 @@ export default function AdminDonations() {
   }, []);
 
   async function loadDonations() {
-    const res = await api.get("/donations");
-    setDonations(res.data);
+    try {
+      setLoading(true);
+      setError(null);
+
+      // ✅ IMPORTANT: admin should load from admin route (not user route)
+      const res = await api.get("/donations");
+
+      console.log("✅ Donations API Response:", res.data);
+
+      if (!Array.isArray(res.data)) {
+        throw new Error("Invalid API response format");
+      }
+
+      setDonations(res.data);
+    } catch (err) {
+      console.error("❌ Failed to load donations:", err);
+      setError("Failed to load donations from backend.");
+      setDonations([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function approve(id) {
-    await api.put(`/admin/actions/approve-donation/${id}`);
-    loadDonations();
+    try {
+      await api.put(`/admin/actions/donation/${id}/decision`, {
+        decision: "approved",
+      });
+      loadDonations();
+    } catch (err) {
+      console.error("❌ Approve failed:", err);
+      alert("Approve failed");
+    }
   }
 
   async function reject(id) {
-    await api.put(`/admin/actions/reject-donation/${id}`);
-    loadDonations();
+    try {
+      await api.put(`/admin/actions/donation/${id}/decision`, {
+        decision: "rejected",
+      });
+      loadDonations();
+    } catch (err) {
+      console.error("❌ Reject failed:", err);
+      alert("Reject failed");
+    }
   }
 
-  // Status badge UI
   const statusBadge = (status) => {
-    if (status === "approved")
+    const s = status || "pending";
+
+    if (s === "approved")
       return (
         <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 font-semibold flex items-center gap-1">
           <FiCheck /> Approved
         </span>
       );
 
-    if (status === "rejected")
+    if (s === "rejected")
       return (
         <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 font-semibold flex items-center gap-1">
           <FiX /> Rejected
@@ -53,29 +88,48 @@ export default function AdminDonations() {
     );
   };
 
-  // SEARCH + FILTER
+  // ✅ CRASH-PROOF FILTER
   const filtered = donations.filter((d) => {
-    return (
-      (statusFilter === "all" || d.status === statusFilter) &&
-      (d.method.toLowerCase().includes(search.toLowerCase()) ||
-        String(d.amount).includes(search) ||
-        String(d.donorId).includes(search))
-    );
+    const method = (d.method || "").toString().toLowerCase();
+    const amount = (d.amount || "").toString();
+    const donorId = (d.donorId || "").toString();
+    const status = d.status || "pending";
+
+    const matchesStatus =
+      statusFilter === "all" || status === statusFilter;
+
+    const matchesSearch =
+      method.includes(search.toLowerCase()) ||
+      amount.includes(search) ||
+      donorId.includes(search);
+
+    return matchesStatus && matchesSearch;
   });
 
-  // PAGINATION
   const start = (page - 1) * ITEMS_PER_PAGE;
   const paginated = filtered.slice(start, start + ITEMS_PER_PAGE);
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+
+  if (loading) {
+    return <div className="p-10 text-xl">Loading donations...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="p-10 text-red-600 text-lg">
+        ❌ {error}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 p-8">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">💰 Manage Donations</h1>
+      <h1 className="text-3xl font-bold text-gray-800 mb-6">
+        💰 Manage Donations
+      </h1>
 
-      {/* SEARCH + FILTER BAR */}
+      {/* SEARCH + FILTER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-
-        {/* SEARCH */}
         <div className="flex items-center gap-2 bg-white shadow p-2 rounded-lg w-full md:w-1/3 border">
           <FiSearch className="text-gray-600" />
           <input
@@ -87,7 +141,6 @@ export default function AdminDonations() {
           />
         </div>
 
-        {/* FILTER */}
         <select
           className="p-2 bg-white rounded-lg shadow border"
           value={statusFilter}
@@ -109,7 +162,7 @@ export default function AdminDonations() {
           <thead className="bg-gray-100 border-b">
             <tr className="text-gray-700 text-sm font-semibold">
               <th className="p-4">ID</th>
-              <th className="p-4">Donor</th>
+              <th className="p-4">Donor ID</th>
               <th className="p-4">Date</th>
               <th className="p-4">Amount</th>
               <th className="p-4">Method</th>
@@ -119,38 +172,46 @@ export default function AdminDonations() {
           </thead>
 
           <tbody>
-            {paginated.map((d) => (
-              <tr key={d.donationId} className="border-b hover:bg-gray-50 transition">
-                <td className="p-4">{d.donationId}</td>
-                <td className="p-4">{d.donorId}</td>
-                <td className="p-4">{d.donationDate?.slice(0, 10)}</td>
-                <td className="p-4 font-semibold text-blue-600">₹{d.amount}</td>
-                <td className="p-4 capitalize">{d.method}</td>
-                <td className="p-4">{statusBadge(d.status)}</td>
+            {paginated.map((d) => {
+              const status = d.status || "pending";
 
-                <td className="p-4">
-                  {d.status === "pending" ? (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => approve(d.donationId)}
-                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg shadow transition flex items-center gap-1"
-                      >
-                        <FiCheck /> Approve
-                      </button>
+              return (
+                <tr key={d.donationId} className="border-b hover:bg-gray-50 transition">
+                  <td className="p-4">{d.donationId}</td>
+                  <td className="p-4">{d.donorId}</td>
+                  <td className="p-4">
+                    {d.donationDate ? d.donationDate.slice(0, 10) : "—"}
+                  </td>
+                  <td className="p-4 font-semibold text-blue-600">
+                    ₹{d.amount || 0}
+                  </td>
+                  <td className="p-4 capitalize">{d.method || "—"}</td>
+                  <td className="p-4">{statusBadge(status)}</td>
 
-                      <button
-                        onClick={() => reject(d.donationId)}
-                        className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg shadow transition flex items-center gap-1"
-                      >
-                        <FiX /> Reject
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="text-gray-400 italic">No actions</span>
-                  )}
-                </td>
-              </tr>
-            ))}
+                  <td className="p-4">
+                    {status === "pending" ? (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => approve(d.donationId)}
+                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg shadow transition flex items-center gap-1"
+                        >
+                          <FiCheck /> Approve
+                        </button>
+
+                        <button
+                          onClick={() => reject(d.donationId)}
+                          className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg shadow transition flex items-center gap-1"
+                        >
+                          <FiX /> Reject
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 italic">No actions</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
 
             {paginated.length === 0 && (
               <tr>
@@ -173,7 +234,9 @@ export default function AdminDonations() {
           Prev
         </button>
 
-        <span className="font-semibold">{page} / {totalPages}</span>
+        <span className="font-semibold">
+          {page} / {totalPages}
+        </span>
 
         <button
           disabled={page === totalPages}
