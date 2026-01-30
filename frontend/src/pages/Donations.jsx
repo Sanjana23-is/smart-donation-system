@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import api from "../api";
-import Barcode from "react-barcode";
 
 export default function Donations() {
   const [donations, setDonations] = useState([]);
@@ -20,7 +19,7 @@ export default function Donations() {
   async function load() {
     try {
       const res = await api.get("/donations");
-      setDonations(res.data);
+      setDonations(res.data || []);
     } catch (e) {
       console.error("❌ Error loading donations:", e);
     } finally {
@@ -35,8 +34,7 @@ export default function Donations() {
         donorId: form.donorId,
         amount: form.amount,
         method: form.method,
-        donationType: "Money",
-        // only store paymentReference for UPI
+        donationType: "money",
         paymentReference: form.method === "UPI" ? form.paymentReference : null,
       });
 
@@ -93,7 +91,6 @@ export default function Donations() {
             <option value="Bank Transfer">Bank Transfer</option>
           </select>
 
-          {/* Payment Ref only if UPI */}
           {form.method === "UPI" && (
             <input
               placeholder="Enter UPI Transaction ID"
@@ -106,14 +103,12 @@ export default function Donations() {
             />
           )}
 
-          {/* UPI QR visible only if UPI selected */}
           {form.method === "UPI" && (
             <div className="col-span-full flex flex-col items-center mt-4">
               <p className="text-gray-700 mb-2 font-semibold">
-                Scan &amp; Pay (UPI)
+                Scan & Pay (UPI)
               </p>
 
-              {/* IMPORTANT: uses the actual file name in public/ */}
               <img
                 src="/upi-qr.jpeg"
                 alt="UPI QR"
@@ -145,7 +140,6 @@ export default function Donations() {
                 <th className="p-3 border">Payment Ref</th>
                 <th className="p-3 border">Status</th>
                 <th className="p-3 border">UID</th>
-                <th className="p-3 border">Barcode</th>
               </tr>
             </thead>
 
@@ -154,12 +148,13 @@ export default function Donations() {
                 <tr key={d.donationId} className="hover:bg-gray-50 transition">
                   <td className="p-3 border">{d.donationId}</td>
                   <td className="p-3 border">{d.donorId}</td>
-                  <td className="p-3 border font-semibold">₹{d.amount}</td>
-                  <td className="p-3 border">{d.method}</td>
+                  <td className="p-3 border font-semibold">
+                    ₹{d.amount || 0}
+                  </td>
+                  <td className="p-3 border">{d.method || "—"}</td>
                   <td className="p-3 border font-mono text-sm">
                     {d.paymentReference || "—"}
                   </td>
-
                   <td className="p-3 border">
                     <span
                       className={`
@@ -175,23 +170,17 @@ export default function Donations() {
                       {d.status}
                     </span>
                   </td>
-
                   <td className="p-3 border">{d.uid}</td>
-
-                  <td className="p-3 border text-center">
-                    {d.uid ? (
-                      <Barcode
-                        value={d.uid}
-                        height={40}
-                        width={1.2}
-                        displayValue={false}
-                      />
-                    ) : (
-                      "—"
-                    )}
-                  </td>
                 </tr>
               ))}
+
+              {donations.length === 0 && (
+                <tr>
+                  <td colSpan="7" className="p-6 text-center text-gray-500">
+                    No donations found.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

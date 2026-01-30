@@ -1,60 +1,132 @@
 const fs = require("fs");
 const path = require("path");
 
-function analyzeProduct({ imagePaths, category, perishable, expiryDate }) {
+function analyzeProduct({ imagePaths, category, perishable, expiryDate, productName }) {
+  let risk = 0;
+  let reasons = [];
+
+  const cat = (category || "").toLowerCase();
+  const name = (productName || "").toLowerCase();
+
+  // =========================
+  // 1) IMAGE VALIDATION
+  // =========================
   if (!imagePaths || imagePaths.length === 0) {
-    return { status: "rejected", confidence: 95, reason: "No image provided" };
+    risk += 40;
+    reasons.push("No product images provided");
+  } else {
+    let lowQualityCount = 0;
+
+    for (const img of imagePaths) {
+      if (!fs.existsSync(img)) {
+        risk += 40;
+        reasons.push("Image file missing");
+        break;
+      }
+
+      const ext = path.extname(img).toLowerCase();
+      if (![".jpg", ".jpeg", ".png", ".webp"].includes(ext)) {
+        risk += 25;
+        reasons.push("Unsupported image format");
+      }
+
+      const size = fs.statSync(img).size;
+      if (size < 20 * 1024) lowQualityCount++;
+    }
+
+    if (lowQualityCount >= 2) {
+      risk += 20;
+      reasons.push("Low image quality");
+    }
   }
 
-  let lowQuality = 0;
+  // =========================
+  // 2) CATEGORY-BASED RULES (MATCH DROPDOWN)
+  // =========================
 
-  for (const img of imagePaths) {
-    if (!fs.existsSync(img)) {
-      return { status: "rejected", confidence: 90, reason: "Image file missing" };
-    }
+  switch (cat) {
+    case "food":
+      // Food is always sensitive
+      if (!expiryDate) {
+        risk += 30;
+        reasons.push("Missing expiry date for food item");
+      } else if (new Date(expiryDate) <= new Date()) {
+        risk += 60;
+        reasons.push("Expired food item");
+      }
 
-    const ext = path.extname(img).toLowerCase();
-    if (![".jpg", ".jpeg", ".png", ".webp"].includes(ext)) {
-      return { status: "rejected", confidence: 95, reason: "Unsupported image format" };
-    }
+      if (!perishable) {
+        risk += 15;
+        reasons.push("Food not marked as perishable");
+      }
+      break;
 
-    const size = fs.statSync(img).size;
-    if (size < 20 * 1024) lowQuality++;
+    case "clothing":
+      // Clothing needs visual verification
+      if (!imagePaths || imagePaths.length < 2) {
+        risk += 10;
+        reasons.push("Insufficient clothing images");
+      }
+      break;
+
+    case "medical":
+      // Medical items are high risk
+      risk += 70;
+      reasons.push("Medical items require strict verification");
+      break;
+
+    case "electronics":
+      // Electronics are moderate risk
+      risk += 25;
+      reasons.push("Electronics require manual verification");
+      break;
+
+    case "books":
+    case "toys":
+    case "utensils":
+      // Low-risk categories
+      risk += 5;
+      break;
+
+    case "others":
+      risk += 20;
+      reasons.push("Unclassified category");
+      break;
+
+    default:
+      risk += 30;
+      reasons.push("Invalid or unknown category");
   }
 
-  const cat = category.toLowerCase();
-
-  // FOOD RULES
-  if (cat.includes("food") || cat.includes("rice") || cat.includes("grain")) {
-    if (!perishable) {
-      return { status: "review", confidence: 60, reason: "Food not marked perishable" };
-    }
-
-    if (!expiryDate) {
-      return { status: "rejected", confidence: 90, reason: "Missing expiry date" };
-    }
-
-    if (new Date(expiryDate) <= new Date()) {
-      return { status: "rejected", confidence: 95, reason: "Expired food item" };
-    }
-
-    return { status: "review", confidence: 75, reason: "Food requires manual verification" };
+  // =========================
+  // 3) NAME-BASED SAFETY CHECK
+  // =========================
+  if (name.includes("medicine") || name.includes("chemical")) {
+    risk += 40;
+    reasons.push("Potentially dangerous item");
   }
 
-  // CLOTHING RULES
-  if (cat.includes("cloth") || cat.includes("dress") || cat.includes("shirt")) {
-    if (lowQuality >= 2) {
-      return { status: "rejected", confidence: 85, reason: "Poor image quality" };
-    }
-    return { status: "approved", confidence: 85, reason: "Clothing looks acceptable" };
-  }
+  // =========================
+  // 4) NORMALIZE RISK (0–100)
+  // =========================
+  if (risk > 100) risk = 100;
+  if (risk < 0) risk = 0;
 
-  // LOW RISK ITEMS
-  if (cat.includes("book") || cat.includes("toy") || cat.includes("utensil")) {
-    return { status: "approved", confidence: 90, reason: "Low-risk item" };
-  }
+  // =========================
+  // 5) FINAL AI DECISION
+  // =========================
+  let status = "approved";
+  if (risk >= 30 && risk < 70) status = "review";
+  if (risk >= 70) status = "rejected";
 
-  return { status: "review", confidence: 65, reason: "Unknown category" };
+  const confidence = Math.max(10, 100 - risk); // never 0%
+
+  return {
+    status,
+    confidence,
+    reason: reasons.length ? reasons.join(" | ") : "Item appears valid",
+    riskScore: risk, // optional (useful for admin panel later)
+  };
 }
 
 module.exports = { analyzeProduct };

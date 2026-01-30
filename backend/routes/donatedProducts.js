@@ -16,7 +16,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// ✅ GET ALL PRODUCTS
+// GET ALL PRODUCTS
 router.get("/", async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -35,9 +35,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// ✅ ADD PRODUCT + AI ANALYSIS
-// routes/donatedProducts.js
-
+// ADD PRODUCT + AI ANALYSIS
 router.post("/", upload.array("item_images", 3), async (req, res) => {
   try {
     const {
@@ -58,16 +56,16 @@ router.post("/", upload.array("item_images", 3), async (req, res) => {
     const images = req.files ? req.files.map((f) => f.path) : [];
     const uid = "PROD-" + Date.now();
 
-    // ✅ AI ANALYSIS
+    // ✅ UPDATED AI CALL
     const aiResult = analyzeProduct({
       imagePaths: images,
       category,
+      productName,
       perishable: perishable === "true",
       expiryDate,
     });
 
-    // ✅ ALWAYS pending for admin review (important)
-    const status = "pending";
+    const status = "pending"; // admin still decides
 
     await db.query(
       `INSERT INTO donatedProducts
@@ -103,6 +101,5 @@ router.post("/", upload.array("item_images", 3), async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 
 module.exports = router;

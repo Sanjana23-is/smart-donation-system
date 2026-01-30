@@ -80,4 +80,29 @@ router.put("/product/:id/decision", async (req, res) => {
   }
 });
 
+// ===============================
+// APPROVE / REJECT MONEY DONATION
+// ===============================
+router.put("/donation/:id/decision", async (req, res) => {
+  const donationId = req.params.id;
+  const { decision } = req.body;
+
+  if (!["approved", "rejected"].includes(decision)) {
+    return res.status(400).json({ error: "Invalid decision" });
+  }
+
+  try {
+    await db.query(
+      `UPDATE donations SET status = ? WHERE donationId = ?`,
+      [decision, donationId]
+    );
+
+    res.json({ message: `Donation ${decision}` });
+  } catch (err) {
+    console.error("❌ ERROR donation decision:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 module.exports = router;

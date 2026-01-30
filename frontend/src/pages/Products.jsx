@@ -2,6 +2,17 @@ import React, { useEffect, useState } from "react";
 import api from "../api";
 import Barcode from "react-barcode";
 
+const CATEGORY_OPTIONS = [
+  { value: "clothing", label: "Clothing" },
+  { value: "food", label: "Food / Groceries" },
+  { value: "books", label: "Books" },
+  { value: "toys", label: "Toys" },
+  { value: "electronics", label: "Electronics" },
+  { value: "utensils", label: "Utensils" },
+  { value: "medical", label: "Medical Supplies" },
+  { value: "others", label: "Others" },
+];
+
 export default function Products() {
   const [products, setProducts] = useState([]);
   const [images, setImages] = useState([]);
@@ -23,11 +34,16 @@ export default function Products() {
 
   async function load() {
     const res = await api.get("/donated-products");
-    setProducts(res.data);
+    setProducts(res.data || []);
   }
 
   async function submit(e) {
     e.preventDefault();
+
+    if (!form.category) {
+      alert("Please select a category.");
+      return;
+    }
 
     if (form.perishable && (!form.manufactureDate || !form.expiryDate)) {
       alert("Enter manufacture and expiry dates.");
@@ -40,7 +56,6 @@ export default function Products() {
     }
 
     const formData = new FormData();
-
     formData.append("donorId", form.donorId);
     formData.append("productName", form.productName);
     formData.append("category", form.category);
@@ -53,9 +68,7 @@ export default function Products() {
       formData.append("expiryDate", form.expiryDate);
     }
 
-    images.forEach((img) => {
-      formData.append("item_images", img);
-    });
+    images.forEach((img) => formData.append("item_images", img));
 
     try {
       await api.post("/donated-products", formData, {
@@ -109,13 +122,20 @@ export default function Products() {
             required
           />
 
-          <input
-            placeholder="Category"
+          {/* ✅ CATEGORY DROPDOWN (IMPORTANT) */}
+          <select
             value={form.category}
             onChange={(e) => setForm({ ...form, category: e.target.value })}
             className="p-3 border rounded-lg"
             required
-          />
+          >
+            <option value="">Select Category</option>
+            {CATEGORY_OPTIONS.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
 
           <input
             type="number"
@@ -127,7 +147,7 @@ export default function Products() {
           />
 
           <input
-            placeholder="Unit"
+            placeholder="Unit (kg, pcs, packets, etc.)"
             value={form.unit}
             onChange={(e) => setForm({ ...form, unit: e.target.value })}
             className="p-3 border rounded-lg"
@@ -242,16 +262,17 @@ export default function Products() {
                 <td className="p-3 border">{p.uid || "—"}</td>
                 <td className="p-3 border text-center">
                   {p.uid ? (
-                    <Barcode value={p.uid} height={40} width={1.2} displayValue={false} />
+                    <Barcode
+                      value={p.uid}
+                      height={40}
+                      width={1.2}
+                      displayValue={false}
+                    />
                   ) : (
                     "—"
                   )}
                 </td>
-                <td className="p-3 border">
-                  <span className="px-3 py-1 rounded-full text-sm font-semibold">
-                    {p.status}
-                  </span>
-                </td>
+                <td className="p-3 border">{p.status}</td>
               </tr>
             ))}
           </tbody>

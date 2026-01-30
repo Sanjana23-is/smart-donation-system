@@ -1,17 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
-const upload = require("../middleware/upload");
-const parseImages = require("../utils/imageParser");
 
-// UID generator
 function generateUID() {
   return "DON-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
 }
 
-/* ===============================
-   ADD MONEY DONATION (JSON)
-================================ */
+// ADD DONATION
 router.post("/", async (req, res) => {
   try {
     const { donorId, donationType, amount, method, paymentReference } = req.body;
@@ -21,7 +16,10 @@ router.post("/", async (req, res) => {
     }
 
     const uid = generateUID();
-    const barcode = uid;
+
+    // ✅ barcode ONLY for product donation
+    const isProduct = donationType.toLowerCase() === "product";
+    const barcode = isProduct ? uid : null;
 
     const [result] = await db.query(
       `INSERT INTO donations
@@ -31,7 +29,7 @@ router.post("/", async (req, res) => {
       'pending', ?, ?, ?)`,
       [
         donorId,
-        donationType,
+        donationType.toLowerCase(),
         amount || null,
         method || null,
         uid,
@@ -44,6 +42,7 @@ router.post("/", async (req, res) => {
       message: "Donation added successfully",
       donationId: result.insertId,
       uid,
+      barcode,
     });
   } catch (err) {
     console.error("❌ ERROR ADDING DONATION:", err);
@@ -51,55 +50,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-/* ===============================
-   ADD DONATION WITH IMAGE
-================================ */
-router.post("/with-image", upload.single("itemImage"), async (req, res) => {
-  try {
-    const { donorId, donationType, amount, method, paymentReference } = req.body;
-
-    if (!donorId || !donationType) {
-      return res.status(400).json({ error: "donorId and donationType required" });
-    }
-
-    const uid = generateUID();
-    const barcode = uid;
-
-    const imagePath = req.file ? req.file.path : null;
-
-    const [result] = await db.query(
-      `INSERT INTO donations
-      (donorId, donationDate, donationType, amount, method, donatedAt,
-       status, uid, barcode, paymentReference, itemImage)
-      VALUES (?, CURDATE(), ?, ?, ?, NOW(),
-      'pending', ?, ?, ?, ?)`,
-      [
-        donorId,
-        donationType,
-        amount || null,
-        method || null,
-        uid,
-        barcode,
-        paymentReference || null,
-        imagePath,
-      ]
-    );
-
-    res.json({
-      message: "Donation with image added",
-      donationId: result.insertId,
-      uid,
-      imagePath,
-    });
-  } catch (err) {
-    console.error("❌ ERROR ADDING DONATION WITH IMAGE:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/* ===============================
-   GET ALL DONATIONS
-================================ */
+// GET DONATIONS
 router.get("/", async (req, res) => {
   try {
     const [rows] = await db.query(`
@@ -113,7 +64,6 @@ router.get("/", async (req, res) => {
         uid,
         barcode,
         paymentReference,
-        itemImage,
         donatedAt
       FROM donations
       ORDER BY donationId DESC
@@ -121,10 +71,9 @@ router.get("/", async (req, res) => {
 
     res.json(rows);
   } catch (err) {
-    console.error("❌ ADMIN DONATIONS ERROR:", err);
+    console.error("❌ ERROR FETCHING DONATIONS:", err);
     res.status(500).json({ error: err.message });
   }
 });
-
 
 module.exports = router;
