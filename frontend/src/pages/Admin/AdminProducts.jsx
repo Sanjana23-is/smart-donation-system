@@ -1,80 +1,117 @@
+//frontend/src/pages/AdminProducts.jsx.  
 import React, { useEffect, useState } from "react";
 import api from "../../api";
 
 export default function AdminProducts() {
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  /* ===============================
+     STATE MANAGEMENT
+  ================================ */
+  const [pendingProducts, setPendingProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [showModal, setShowModal] = useState(false);
-  const [actionType, setActionType] = useState("");
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [remark, setRemark] = useState("");
+  const [isDecisionModalOpen, setIsDecisionModalOpen] = useState(false);
+  const [decisionType, setDecisionType] = useState(null); // approved | rejected
+  const [productUnderReview, setProductUnderReview] = useState(null);
+  const [adminRemark, setAdminRemark] = useState("");
 
+  /* ===============================
+     LIFECYCLE
+  ================================ */
   useEffect(() => {
-    loadProducts();
+    fetchPendingProducts();
   }, []);
 
-  async function loadProducts() {
+  /* ===============================
+     API CALLS
+  ================================ */
+  async function fetchPendingProducts() {
     try {
-      const res = await api.get("/admin/actions/pending-products");
-      setProducts(res.data || []);
-    } catch (err) {
-      console.error("❌ Load products error:", err);
-      alert("Failed to load products");
+      const response = await api.get("/admin/actions/pending-products");
+      setPendingProducts(response.data || []);
+    } catch (error) {
+      console.error("Failed to load pending products", error);
+      alert("Unable to load products");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   }
 
-  function getImage(img) {
-    if (!img) return null;
+
+  // check what you are passing in the API Body.
+  async function submitProductDecision() {
+    if (!productUnderReview || !decisionType) return;
+
     try {
-      const parsed = JSON.parse(img);
-      return Array.isArray(parsed) ? parsed[0] : null;
-    } catch {
-      return img;
+    await api.put(
+      `/admin/actions/product/${productUnderReview.productId}/decision`,
+      {
+        decision: decisionType,
+        adminRemark,
+      }
+    );
+
+
+      closeDecisionModal();
+      await fetchPendingProducts();
+
+      alert(`Product ${decisionType.toUpperCase()}`);
+    } catch (error) {
+      console.error("Decision submission failed", error);
+      alert("Action failed");
     }
   }
 
-  function aiColor(status) {
+  /* ===============================
+     UI EVENT HANDLERS
+  ================================ */
+  function openDecisionModal(type, product) {
+    setDecisionType(type);
+    setProductUnderReview(product);
+    setIsDecisionModalOpen(true);
+  }
+
+  function closeDecisionModal() {
+    setIsDecisionModalOpen(false);
+    setDecisionType(null);
+    setProductUnderReview(null);
+    setAdminRemark("");
+  }
+
+  /* ===============================
+     HELPERS
+  ================================ */
+  function resolveProductImage(image) {
+    if (!image) return null;
+    try {
+      const parsed = JSON.parse(image);
+      return Array.isArray(parsed) ? parsed[0] : image;
+    } catch {
+      return image;
+    }
+  }
+
+  function getAIStatusColor(status) {
     if (status === "approved") return "bg-green-100 text-green-700";
     if (status === "rejected") return "bg-red-100 text-red-700";
     return "bg-yellow-100 text-yellow-700";
   }
 
-  function confidenceColor(value) {
+  function getConfidenceBarColor(value) {
     if (value >= 70) return "bg-green-500";
     if (value >= 40) return "bg-yellow-500";
     return "bg-red-500";
   }
 
-  async function handleDecision() {
-    try {
-      await api.put(
-        `/admin/actions/product/${selectedProduct.productId}/decision`,
-        {
-          decision: actionType,
-          adminRemark: remark,
-        }
-      );
-
-      alert(`Product ${actionType}`);
-      setShowModal(false);
-      setRemark("");
-      loadProducts();
-    } catch (err) {
-      console.error(err);
-      alert("Action failed");
-    }
-  }
-
+  /* ===============================
+     RENDER
+  ================================ */
   return (
     <div className="min-h-screen p-6 bg-gray-100">
       <h2 className="text-2xl font-bold mb-6">🤖 AI Product Review Panel</h2>
 
-      {loading ? (
+      {isLoading ? (
         <p>Loading...</p>
-      ) : products.length === 0 ? (
+      ) : pendingProducts.length === 0 ? (
         <p>No pending products.</p>
       ) : (
         <div className="overflow-x-auto bg-white shadow-xl rounded-xl">
@@ -92,22 +129,29 @@ export default function AdminProducts() {
             </thead>
 
             <tbody>
-              {products.map((p) => {
-                const img = getImage(p.item_image);
-                const confidence =
-                  typeof p.ai_confidence === "number"
-                    ? Math.round(p.ai_confidence)
-                    : 0;
+              {pendingProducts.map((product) => {
+                const image = resolveProductImage(product.item_image);
+                const confidence = Number.isFinite(Number(product.ai_confidence))
+                  ? Math.round(Number(product.ai_confidence))
+                  : 50;
 
                 return (
-                  <tr key={p.productId} className="border-t hover:bg-gray-50">
-                    <td className="p-3 font-medium">{p.productName}</td>
-                    <td className="p-3 capitalize">{p.category || "—"}</td>
+                  <tr
+                    key={product.productId}
+                    className="border-t hover:bg-gray-50"
+                  >
+                    <td className="p-3 font-medium">
+                      {product.productName}
+                    </td>
+
+                    <td className="p-3 capitalize">
+                      {product.category || "—"}
+                    </td>
 
                     <td className="p-3">
-                      {img ? (
+                      {image ? (
                         <img
-                          src={`http://localhost:3000/uploads/${img}`}
+                          src={`http://localhost:3000/uploads/${image}`}
                           className="w-14 h-14 rounded-lg object-cover border"
                           alt="product"
                         />
@@ -118,53 +162,47 @@ export default function AdminProducts() {
 
                     <td className="p-3">
                       <span
-                        className={`px-2 py-1 rounded text-xs font-semibold ${aiColor(
-                          p.ai_status
+                        className={`px-2 py-1 rounded text-xs font-semibold ${getAIStatusColor(
+                          product.ai_status
                         )}`}
                       >
-                        {p.ai_status || "review"}
+                        {product.ai_status || "review"}
                       </span>
                     </td>
 
-                    {/* AI CONFIDENCE BAR */}
                     <td className="p-3 w-40">
                       <div className="text-xs font-semibold mb-1">
                         {confidence}%
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
-                          className={`h-2 rounded-full ${confidenceColor(
+                          className={`h-2 rounded-full ${getConfidenceBarColor(
                             confidence
                           )}`}
                           style={{ width: `${confidence}%` }}
-                        ></div>
+                        />
                       </div>
                     </td>
 
-                    {/* AI REASON */}
                     <td className="p-3 text-xs text-gray-600 max-w-xs">
-                      {p.ai_reason || "No AI remarks"}
+                      {product.ai_reason || "No AI remarks"}
                     </td>
 
                     <td className="p-3 flex gap-2">
                       <button
                         className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs"
-                        onClick={() => {
-                          setActionType("approved");
-                          setSelectedProduct(p);
-                          setShowModal(true);
-                        }}
+                        onClick={() =>
+                          openDecisionModal("approved", product)
+                        }
                       >
                         Approve
                       </button>
 
                       <button
                         className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs"
-                        onClick={() => {
-                          setActionType("rejected");
-                          setSelectedProduct(p);
-                          setShowModal(true);
-                        }}
+                        onClick={() =>
+                          openDecisionModal("rejected", product)
+                        }
                       >
                         Reject
                       </button>
@@ -177,34 +215,34 @@ export default function AdminProducts() {
         </div>
       )}
 
-      {/* MODAL */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center">
-          <div className="bg-white p-6 rounded-xl w-96 shadow-xl">
-            <h2 className="text-lg font-bold mb-3">
-              {actionType === "approved" ? "Approve Product" : "Reject Product"}
-            </h2>
+      {/* ===============================
+          DECISION MODAL (CONFIRMATION)
+      ================================ */}
+      {isDecisionModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl w-96 shadow-2xl">
+            <h3 className="text-lg font-semibold mb-4">
+              Confirm {decisionType}
+            </h3>
 
             <textarea
-              className="w-full border p-2 rounded mb-4 text-sm"
+              className="w-full border rounded p-2 text-sm mb-4"
               placeholder="Admin remark (optional)"
-              value={remark}
-              onChange={(e) => setRemark(e.target.value)}
+              value={adminRemark}
+              onChange={(e) => setAdminRemark(e.target.value)}
             />
 
             <div className="flex justify-end gap-2">
               <button
-                className="px-3 py-1 bg-gray-400 text-white rounded text-sm"
-                onClick={() => setShowModal(false)}
+                onClick={closeDecisionModal}
+                className="px-4 py-1 text-sm border rounded"
               >
                 Cancel
               </button>
 
               <button
-                className={`px-3 py-1 rounded text-white text-sm ${
-                  actionType === "approved" ? "bg-green-600" : "bg-red-600"
-                }`}
-                onClick={handleDecision}
+                onClick={submitProductDecision}
+                className="px-4 py-1 text-sm bg-blue-600 text-white rounded"
               >
                 Confirm
               </button>
