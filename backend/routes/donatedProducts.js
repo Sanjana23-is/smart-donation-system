@@ -1,41 +1,54 @@
+//backend/routes/donatedaProducts.js
 const express = require("express");
-const router = express.Router();
+const router = express.Router(); // ✅ REQUIRED
 const db = require("../db");
 const multer = require("multer");
 const fs = require("fs");
+const path = require("path");
 const { analyzeProduct } = require("../services/aiService");
 const parseImages = require("../utils/imageParser");
 
-const uploadDir = "uploads";
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
+/* ===============================
+   UPLOAD CONFIG (MULTER)
+================================ */
+const uploadDir = path.join(__dirname, "../uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
+  destination: uploadDir,
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + "-" + file.originalname);
+  },
 });
 
-const upload = multer({ storage });
+const upload = multer({ storage }); // ✅ THIS WAS MISSING
 
-// GET ALL PRODUCTS
+/* ===============================
+   GET PRODUCTS
+================================ */
 router.get("/", async (req, res) => {
   try {
     const [rows] = await db.query(
       "SELECT * FROM donatedProducts ORDER BY donatedAt DESC"
     );
 
-    const result = rows.map((r) => ({
-      ...r,
-      item_image: parseImages(r.item_image),
-    }));
-
-    res.json(result);
+    res.json(
+      rows.map((r) => ({
+        ...r,
+        item_image: parseImages(r.item_image),
+      }))
+    );
   } catch (err) {
     console.error("❌ FETCH PRODUCTS ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ADD PRODUCT + AI ANALYSIS
+/* ===============================
+   ADD PRODUCT + AI ANALYSIS
+================================ */
 router.post("/", upload.array("item_images", 3), async (req, res) => {
   try {
     const {
@@ -53,19 +66,27 @@ router.post("/", upload.array("item_images", 3), async (req, res) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
+    const isPerishable =
+      perishable === "true" || perishable === true || perishable === "1";
+
     const images = req.files ? req.files.map((f) => f.path) : [];
     const uid = "PROD-" + Date.now();
 
-    // ✅ UPDATED AI CALL
-    const aiResult = analyzeProduct({
+    // ✅ AI ANALYSIS (AWAITED)
+    const aiResult = await analyzeProduct({
       imagePaths: images,
       category,
       productName,
-      perishable: perishable === "true",
+      perishable: isPerishable,
       expiryDate,
     });
 
-    const status = "pending"; // admin still decides
+    const aiStatus = aiResult?.status || "review";
+    const aiConfidence = Number.isFinite(aiResult?.confidence)
+      ? aiResult.confidence
+      : 50;
+
+    const aiReason = aiResult?.reason || "AI analysis completed";
 
     await db.query(
       `INSERT INTO donatedProducts
@@ -76,23 +97,25 @@ router.post("/", upload.array("item_images", 3), async (req, res) => {
       [
         donorId || null,
         productName,
-        category,
+        category.toLowerCase(),
         quantity,
         unit,
-        perishable === "true" ? 1 : 0,
+        isPerishable ? 1 : 0,
         manufactureDate || null,
         expiryDate || null,
-        JSON.stringify(images),
+        JSON.stringify(
+          req.files.map((f) => "uploads/" + path.basename(f.path))
+        ),
         uid,
-        status,
-        aiResult.status,
-        aiResult.confidence,
-        aiResult.reason,
+        "pending",
+        aiStatus,
+        aiConfidence,
+        aiReason,
       ]
     );
 
     res.json({
-      message: "Product submitted. AI analyzed + Admin review pending.",
+      message: "Product submitted with AI analysis",
       uid,
       aiResult,
     });

@@ -1,29 +1,26 @@
+// backend/routes/tracking.js
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
 
-// ------------------------------------------
-// SAVE REDIRECT / DISPATCH ENTRY
-// POST /api/tracking/redirect
-// ------------------------------------------
+/* ===============================
+   ADD DISPATCH / DELIVERY EVENT
+================================ */
 router.post("/redirect", async (req, res) => {
+  const {
+    inventoryId,
+    toLocation,
+    dispatchDate,
+    deliveredDate,
+  } = req.body;
+
+  if (!inventoryId || !toLocation || !dispatchDate) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
   try {
-    const {
-      inventoryId,
-      dispatchToType,
-      dispatchToId,
-      dispatchDate,
-      deliveredDate
-    } = req.body;
-
-    // Basic validation
-    if (!inventoryId || !dispatchToType || !dispatchToId || !dispatchDate) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
-
-    // 🔹 Fetch UID from inventories (CRITICAL FIX)
     const [[inv]] = await db.query(
-      "SELECT uid FROM inventories WHERE inventoryId = ?",
+      `SELECT uid FROM inventories WHERE inventoryId = ?`,
       [inventoryId]
     );
 
@@ -31,57 +28,47 @@ router.post("/redirect", async (req, res) => {
       return res.status(404).json({ error: "Inventory not found" });
     }
 
-    // 🔹 Insert tracking history WITH UID
     await db.query(
       `INSERT INTO trackinghistory
-       (inventoryId, uid, dispatchFrom, dispatchTo, dispatchToType,
-        dispatchDate, deliveredDate, status)
-       VALUES (?, ?, 'Main Warehouse', ?, ?, ?, ?, ?)`,
+       (uid, inventoryId, status, fromLocation, toLocation,
+        dispatchDate, deliveredDate, createdAt)
+       VALUES (?, ?, ?, 'Main Warehouse', ?, ?, ?, NOW())`,
       [
-        inventoryId,
         inv.uid,
-        dispatchToId,
-        dispatchToType,
+        inventoryId,
+        deliveredDate ? "delivered" : "dispatched",
+        toLocation,
         dispatchDate,
         deliveredDate || null,
-        deliveredDate ? "delivered" : "dispatched"
       ]
     );
 
-    res.json({ message: "Tracking redirect saved successfully" });
-
+    res.json({ message: "Tracking updated successfully" });
   } catch (err) {
-    console.error("❌ TRACKING REDIRECT ERROR:", err);
+    console.error("❌ TRACKING ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ------------------------------------------
-// GET FULL TRACKING HISTORY BY UID
-// GET /api/tracking/:uid
-// ------------------------------------------
+/* ===============================
+   GET FULL TRACKING BY UID
+================================ */
 router.get("/:uid", async (req, res) => {
-  try {
-    const uid = req.params.uid;
+  const uid = req.params.uid;
 
-    const [rows] = await db.query(
-      `SELECT *
-       FROM trackinghistory
-       WHERE uid = ?
-       ORDER BY createdAt ASC`,
-      [uid]
-    );
+  const [rows] = await db.query(
+    `SELECT *
+     FROM trackinghistory
+     WHERE uid = ?
+     ORDER BY createdAt ASC`,
+    [uid]
+  );
 
-    if (rows.length === 0) {
-      return res.status(404).json({ error: "No tracking history found for this UID" });
-    }
-
-    res.json(rows);
-
-  } catch (err) {
-    console.error("❌ FETCH TRACKING HISTORY ERROR:", err);
-    res.status(500).json({ error: err.message });
+  if (!rows.length) {
+    return res.status(404).json({ error: "No tracking found" });
   }
+
+  res.json(rows);
 });
 
 module.exports = router;
