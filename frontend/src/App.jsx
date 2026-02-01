@@ -18,6 +18,7 @@ import QRPage from "./pages/QRPage";
 import DisasterRequestForm from "./pages/DisasterRequestForm";
 import Tracking from "./pages/Tracking";
 import ItemDonation from "./pages/ItemDonation";
+import Notifications from "./pages/Notifications";
 import ExpiringItems from "./pages/Admin/ExpiringItems";
 
 // ------------------- AUTH -------------------
@@ -53,6 +54,9 @@ export default function App() {
 
       case "Products":
         return <Products />;
+
+      case "Notifications":
+        return <Notifications />;
 
       case "Disasters":
         return <Disasters />;

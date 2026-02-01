@@ -7,6 +7,7 @@ const fs = require("fs");
 const path = require("path");
 const { analyzeProduct } = require("../services/aiService");
 const parseImages = require("../utils/imageParser");
+const userAuth = require("../middleware/userAuth"); // ✅ IMPORT AUTH MIDDLEWARE
 
 /* ===============================
    UPLOAD CONFIG (MULTER)
@@ -49,7 +50,7 @@ router.get("/", async (req, res) => {
 /* ===============================
    ADD PRODUCT + AI ANALYSIS
 ================================ */
-router.post("/", upload.array("item_images", 3), async (req, res) => {
+router.post("/", userAuth, upload.array("item_images", 3), async (req, res) => {
   try {
     const {
       donorId,
@@ -88,14 +89,24 @@ router.post("/", upload.array("item_images", 3), async (req, res) => {
 
     const aiReason = aiResult?.reason || "AI analysis completed";
 
+    // AUTHENTICATED USER ID
+    // We expect userAuth middleware to be used here. 
+    // If not, we will need to add it to the route definition.
+    // For now, let's assume if req.user exists we use it.
+    // However, the original code used `donorId` from body.
+    // We MUST prioritize req.user.userId if available.
+
+    const userId = req.user ? req.user.userId : null;
+
     await db.query(
       `INSERT INTO donatedProducts
-      (donorId, productName, category, quantity, unit, perishable,
+      (donorId, userId, productName, category, quantity, unit, perishable,
        manufactureDate, expiryDate, item_image, uid,
        status, ai_status, ai_confidence, ai_reason)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         donorId || null,
+        userId, // ✅ STORING AUTHENTICATED USER ID
         productName,
         category.toLowerCase(),
         quantity,

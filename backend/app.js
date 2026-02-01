@@ -27,6 +27,7 @@ app.use("/api/expiry-alerts", require("./routes/expiryAlerts"));
 app.use("/api/disasters", require("./routes/disasters"));
 app.use("/api/orphanages", require("./routes/orphanages"));
 app.use("/api/dashboard", require("./routes/dashboard"));
+app.use("/api/notifications", require("./routes/notifications"));
 
 
 // Default route

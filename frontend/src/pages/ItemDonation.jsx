@@ -1,10 +1,19 @@
-import React, { useState } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import api from "../api";
+import { AuthContext } from "../context/AuthContext"; // Import AuthContext
 
 export default function ItemDonation() {
+  const { user } = useContext(AuthContext); // Get logged-in user
   const [donorId, setDonorId] = useState("");
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // Auto-fill donorId
+  useEffect(() => {
+    if (user?.userId) {
+      setDonorId(user.userId);
+    }
+  }, [user]);
 
   async function submit(e) {
     e.preventDefault();
@@ -28,7 +37,7 @@ export default function ItemDonation() {
 
       alert("Item donation submitted. AI + Admin review pending.");
 
-      setDonorId("");
+      // Reset image but keep donorId
       setImage(null);
     } catch (err) {
       console.error(err);
@@ -45,14 +54,15 @@ export default function ItemDonation() {
       </h2>
 
       <form onSubmit={submit} className="space-y-4">
-        <input
-          type="text"
-          placeholder="Donor ID"
-          value={donorId}
-          onChange={(e) => setDonorId(e.target.value)}
-          className="w-full p-3 border rounded"
-          required
-        />
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Donor ID (Auto-filled)</label>
+          <input
+            type="text"
+            value={donorId}
+            readOnly
+            className="w-full p-3 border rounded bg-gray-100 text-gray-500 cursor-not-allowed"
+          />
+        </div>
 
         <input
           type="file"

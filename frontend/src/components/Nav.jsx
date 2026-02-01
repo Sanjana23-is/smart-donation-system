@@ -6,7 +6,8 @@ export default function Nav({ current, setCurrent }) {
     "Donors",
     "Donations",
     "Products",
-    
+    "Notifications",
+
     "RequestDisaster",
     "Disasters",
     "Orphanages",
@@ -39,10 +40,9 @@ export default function Nav({ current, setCurrent }) {
                 key={i}
                 onClick={() => setCurrent(i)}
                 className={`relative px-3 py-1.5 font-medium transition-all duration-300
-                  ${
-                    active
-                      ? "text-blue-600"
-                      : "text-gray-600 hover:text-gray-900"
+                  ${active
+                    ? "text-blue-600"
+                    : "text-gray-600 hover:text-gray-900"
                   }`}
               >
                 {label}
