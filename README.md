@@ -53,15 +53,20 @@ The system includes a **lightweight AI module** for product verification:
 
 ## Tech Stack
 
-**Frontend**
-- React
-- Tailwind CSS
-- Axios
 
-**Backend**
-- Node.js
-- Express.js
-- MySQL
+## 🧩 Tech Stack
+
+| Layer            | Technology                               |
+|------------------|------------------------------------------|
+| Frontend         | React                                    |
+| Backend          | Node.js + Express                        |
+| Database         | MySQL                                    |
+| Authentication   | JWT                                      |
+| Email            | Nodemailer (Gmail App Password)          |
+| Notifications    | In-app & Email                           |
+| AI               | TensorFlow.js, MobileNet (Pretrained)    |
+
+
 
 **AI**
 - TensorFlow.js
