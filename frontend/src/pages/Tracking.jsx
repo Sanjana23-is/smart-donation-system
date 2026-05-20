@@ -22,10 +22,12 @@ export default function Tracking() {
   const [cameraError, setCameraError] = useState(null);
 
   const { ref } = useZxing({
+    paused: !openScanner,
+    deviceId: selectedDeviceId,
     onDecodeResult(result) {
       const code = result.getText();
       setUid(code);
-      closeCamera();
+      setOpenScanner(false);
       search(code);
     },
   });
@@ -58,41 +60,7 @@ export default function Tracking() {
     loadDevices();
   }, []);
 
-  useEffect(() => {
-    if (!openScanner) return;
-
-    async function startCamera() {
-      setCameraError(null);
-      try {
-        const constraints = {
-          video: selectedDeviceId
-            ? { deviceId: { exact: selectedDeviceId } }
-            : { facingMode: "environment" },
-        };
-
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        if (ref.current) {
-          ref.current.srcObject = stream;
-          ref.current.setAttribute("playsinline", "");
-          ref.current.muted = true;
-          await ref.current.play();
-        }
-      } catch (err) {
-        setCameraError("Unable to access camera");
-      }
-    }
-
-    startCamera();
-    return () => closeCamera();
-  }, [openScanner, selectedDeviceId, ref]);
-
-  const closeCamera = () => {
-    if (ref.current && ref.current.srcObject) {
-      ref.current.srcObject.getTracks().forEach((t) => t.stop());
-      ref.current.srcObject = null;
-    }
-    setOpenScanner(false);
-  };
+  // Camera handling is now entirely managed by useZxing
 
   async function search(u = uid) {
     if (!u) return alert("Enter UID");
@@ -105,6 +73,43 @@ export default function Tracking() {
       setHistory([]);
     }
   }
+
+  const handleCapture = async () => {
+    if (!ref.current) return;
+    try {
+      if ('BarcodeDetector' in window) {
+        const detector = new window.BarcodeDetector();
+        const barcodes = await detector.detect(ref.current);
+        if (barcodes.length > 0) {
+          const code = barcodes[0].rawValue;
+          setUid(code);
+          setOpenScanner(false);
+          search(code);
+          return;
+        }
+      }
+      
+      const { BrowserMultiFormatReader } = await import('@zxing/library');
+      const reader = new BrowserMultiFormatReader();
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = ref.current.videoWidth;
+      canvas.height = ref.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(ref.current, 0, 0, canvas.width, canvas.height);
+      
+      const img = new Image();
+      img.src = canvas.toDataURL();
+      await new Promise(r => img.onload = r);
+      
+      const result = await reader.decodeFromImageElement(img);
+      setUid(result.getText());
+      setOpenScanner(false);
+      search(result.getText());
+    } catch (e) {
+      alert("Barcode not detected in this frame. Ensure it is clear and well-lit.");
+    }
+  };
 
   const statusIcon = (status) => {
     if (status === "Delivered")
@@ -135,10 +140,7 @@ export default function Tracking() {
               ? "bg-red-600 hover:bg-red-700"
               : "bg-blue-600 hover:bg-blue-700"
           }`}
-          onClick={() => {
-            if (openScanner) closeCamera();
-            else setOpenScanner(true);
-          }}
+          onClick={() => setOpenScanner(!openScanner)}
         >
           {openScanner ? <FiCameraOff size={24} /> : <FiCamera size={24} />}
           {openScanner ? "Close Camera" : "Scan Barcode"}
@@ -169,6 +171,12 @@ export default function Tracking() {
               muted
               autoPlay
             />
+            <button
+              onClick={handleCapture}
+              className="w-full mt-3 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition"
+            >
+              📸 Capture & Scan Frame
+            </button>
             {cameraError && <p className="text-red-600 mt-2">{cameraError}</p>}
           </div>
         )}
