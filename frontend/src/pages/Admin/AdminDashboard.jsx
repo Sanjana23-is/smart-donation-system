@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import AdminNav from "./AdminNav";
 import api from "../../api";
 import {
@@ -88,6 +89,9 @@ export default function AdminDashboard() {
             link="/admin/expiring"
           />
         </div>
+        
+        {/* ANALYTICS CHARTS */}
+        <DashboardCharts />
 
         {/* QUICK ACCESS */}
         <h2 className="text-2xl font-bold mt-12 mb-4 text-gray-800">
@@ -167,5 +171,63 @@ function QuickLink({ label, to, icon }) {
         </div>
       </div>
     </a>
+  );
+}
+
+/* ------------------------------------------------ */
+/* CHARTS COMPONENT */
+/* ------------------------------------------------ */
+function DashboardCharts() {
+  const [chartData, setChartData] = useState({ trends: [], aiStats: [] });
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await api.get("/dashboard/charts");
+        setChartData(res.data);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    load();
+  }, []);
+
+  const COLORS = ["#00C49F", "#FF8042", "#FFBB28"];
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-12 mb-4">
+       <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+         <h3 className="text-xl font-bold mb-4">Donation Trends (Last 7 Days)</h3>
+         <div className="h-64">
+           <ResponsiveContainer width="100%" height="100%">
+             <LineChart data={chartData.trends}>
+               <CartesianGrid strokeDasharray="3 3" />
+               <XAxis dataKey="date" tickFormatter={(v) => v ? v.slice(5) : ''} />
+               <YAxis allowDecimals={false} />
+               <RechartsTooltip />
+               <Legend />
+               <Line type="monotone" dataKey="count" stroke="#6366f1" name="Products" strokeWidth={3} />
+             </LineChart>
+           </ResponsiveContainer>
+         </div>
+       </div>
+
+       <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+         <h3 className="text-xl font-bold mb-4">AI Risk Analysis Breakdown</h3>
+         <div className="h-64">
+           <ResponsiveContainer width="100%" height="100%">
+             <PieChart>
+               <Pie data={chartData.aiStats} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} fill="#82ca9d" label>
+                  {chartData.aiStats.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+               </Pie>
+               <RechartsTooltip />
+               <Legend />
+             </PieChart>
+           </ResponsiveContainer>
+         </div>
+       </div>
+    </div>
   );
 }

@@ -4,17 +4,27 @@ const db = require("../db");
 const { sendNotificationEmail } = require("../utils/emailService");
 
 /* ===============================
-   GET PENDING PRODUCTS
+   GET PENDING PRODUCTS (PAGINATED)
 ================================ */
 router.get("/pending-products", async (req, res) => {
   try {
-    const [rows] = await db.query(`
-      SELECT * FROM donatedProducts
-      WHERE status = 'pending'
-      ORDER BY donatedAt DESC
-    `);
+    const page  = Math.max(1, parseInt(req.query.page  || "1"));
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit || "10")));
+    const offset = (page - 1) * limit;
 
-    res.json(rows);
+    const [[{ total }]] = await db.query(
+      "SELECT COUNT(*) AS total FROM donatedProducts WHERE status = 'pending'"
+    );
+
+    const [rows] = await db.query(
+      `SELECT * FROM donatedProducts
+       WHERE status = 'pending'
+       ORDER BY donatedAt DESC
+       LIMIT ? OFFSET ?`,
+      [limit, offset]
+    );
+
+    res.json({ data: rows, total, page, limit });
   } catch (err) {
     console.error("❌ FETCH PENDING PRODUCTS ERROR:", err);
     res.status(500).json({ error: "Failed to fetch pending products" });
@@ -101,7 +111,7 @@ router.put("/product/:id/decision", async (req, res) => {
       await connection.commit();
 
       // Send Notification (Fire & Forget)
-      sendDecisionNotification(notificationData);
+      sendDecisionNotification(notificationData, req.app.locals.io);
 
       return res.json({ message: "Product rejected by admin" });
     }
@@ -146,7 +156,7 @@ router.put("/product/:id/decision", async (req, res) => {
     await connection.commit();
 
     // Send Notification (Fire & Forget)
-    sendDecisionNotification(notificationData);
+    sendDecisionNotification(notificationData, req.app.locals.io);
 
     res.json({
       message: "Product approved and moved to inventory",
@@ -165,7 +175,7 @@ router.put("/product/:id/decision", async (req, res) => {
 /* ===============================
    HELPER: SEND NOTIFICATIONS
 ================================ */
-async function sendDecisionNotification({ donorId, productName, decision, adminRemark }) {
+async function sendDecisionNotification({ donorId, productName, decision, adminRemark }, io) {
   // donorId argument here effectively means userId.
   // We renamed the property in the caller for compatibility, but it MUST be a valid userId now.
 
@@ -226,7 +236,6 @@ async function sendDecisionNotification({ donorId, productName, decision, adminR
     }
 
     /* ---------- 3. INSERT IN-APP NOTIFICATION ---------- */
-    // This always happens if we have a userId, even if email is missing
     console.log(`🔔 Creating in-app notification for User ID: ${donorId}`);
     await db.query(
       `INSERT INTO notifications (userId, title, message, type, createdAt) 
@@ -234,7 +243,18 @@ async function sendDecisionNotification({ donorId, productName, decision, adminR
       [donorId, title, message, type]
     );
 
-    /* ---------- 4. SEND EMAIL (IF EMAIL EXISTS) ---------- */
+    /* ---------- 4. REAL-TIME SOCKET NOTIFICATION ---------- */
+    if (io) {
+      io.to(`user_${donorId}`).emit("decision_update", {
+        productName,
+        decision,
+        message,
+        adminRemark,
+      });
+      console.log(`⚡ Socket event emitted to user_${donorId}`);
+    }
+
+    /* ---------- 5. SEND EMAIL (IF EMAIL EXISTS) ---------- */
     if (donorEmail) {
       console.log(`📤 Sending email to ${donorEmail}...`);
       await sendNotificationEmail(donorEmail, emailSubject, emailBody);
@@ -289,7 +309,7 @@ router.put("/donation/:id/decision", async (req, res) => {
         productName: `Money Donation (₹${donation.amount})`,
         decision,
         adminRemark: "Clean admin decision"
-      });
+      }, req.app.locals.io);
     }
 
     res.json({ message: `Donation ${decision}` });

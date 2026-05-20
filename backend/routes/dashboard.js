@@ -35,5 +35,29 @@ router.get("/", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 module.exports = router;
+
+router.get("/charts", async (req, res) => {
+  try {
+    // 1️⃣ Donation Trends (Last 7 days, products only for simplicity)
+    const [trends] = await db.query(`
+      SELECT DATE(donatedAt) as date, COUNT(*) as count 
+      FROM donatedProducts 
+      WHERE donatedAt >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+      GROUP BY DATE(donatedAt)
+      ORDER BY date ASC
+    `);
+
+    // 2️⃣ AI Rejection Stats
+    const [aiStats] = await db.query(`
+      SELECT IFNULL(ai_status, 'pending') as name, COUNT(*) as value
+      FROM donatedProducts
+      GROUP BY name
+    `);
+
+    res.json({ trends, aiStats });
+  } catch (err) {
+    console.error("❌ DASHBOARD CHARTS ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});

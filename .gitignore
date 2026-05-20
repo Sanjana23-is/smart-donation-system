@@ -1,1 +1,25 @@
-node_modules
+# dependencies
+node_modules/
+
+# environment variables
+.env
+
+# macOS files
+.DS_Store
+
+# logs
+*.log
+
+# build folders
+dist/
+build/
+
+# vscode settings
+.vscode/
+
+# coverage
+coverage/
+
+# temporary files
+tmp/
+temp/

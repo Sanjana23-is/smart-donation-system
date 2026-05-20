@@ -8,6 +8,9 @@ export default function AdminProducts() {
   ================================ */
   const [pendingProducts, setPendingProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [totalRows, setTotalRows] = useState(0);
 
   const [isDecisionModalOpen, setIsDecisionModalOpen] = useState(false);
   const [decisionType, setDecisionType] = useState(null); // approved | rejected
@@ -19,15 +22,16 @@ export default function AdminProducts() {
   ================================ */
   useEffect(() => {
     fetchPendingProducts();
-  }, []);
+  }, [page]);
 
   /* ===============================
      API CALLS
   ================================ */
   async function fetchPendingProducts() {
     try {
-      const response = await api.get("/admin/actions/pending-products");
-      setPendingProducts(response.data || []);
+      const response = await api.get(`/admin/actions/pending-products?page=${page}&limit=${limit}`);
+      setPendingProducts(response.data.data || []);
+      setTotalRows(response.data.total || 0);
     } catch (error) {
       console.error("Failed to load pending products", error);
       alert("Unable to load products");
@@ -212,6 +216,28 @@ export default function AdminProducts() {
               })}
             </tbody>
           </table>
+          {/* PAGINATION CONTROLS */}
+          <div className="flex justify-between items-center p-4 bg-gray-50 border-t">
+            <span className="text-sm text-gray-600">
+              Showing page {page} of {Math.ceil(totalRows / limit) || 1} ({totalRows} total records)
+            </span>
+            <div className="flex gap-2">
+              <button
+                className="px-3 py-1 bg-white border rounded shadow-sm disabled:opacity-50 hover:bg-gray-100"
+                disabled={page <= 1}
+                onClick={() => setPage(p => p - 1)}
+              >
+                Previous
+              </button>
+              <button
+                className="px-3 py-1 bg-white border rounded shadow-sm disabled:opacity-50 hover:bg-gray-100"
+                disabled={page >= Math.ceil(totalRows / limit)}
+                onClick={() => setPage(p => p + 1)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
