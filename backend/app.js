@@ -58,6 +58,7 @@ app.use("/api/disasters", require("./routes/disasters"));
 app.use("/api/orphanages", require("./routes/orphanages"));
 app.use("/api/dashboard", require("./routes/dashboard"));
 app.use("/api/notifications", require("./routes/notifications"));
+app.use("/api/user", require("./routes/user"));
 
 // Default route
 app.get("/", (req, res) => {

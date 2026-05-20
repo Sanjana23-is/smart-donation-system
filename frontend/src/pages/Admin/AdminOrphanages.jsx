@@ -51,7 +51,7 @@ export default function AdminOrphanages() {
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 p-8">
+    <div className="bg-gradient-to-br from-gray-100 to-gray-200 p-8">
 
       {/* PAGE HEADER */}
       <div className="text-center mb-10">

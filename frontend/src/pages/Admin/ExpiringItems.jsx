@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import AdminNav from "./AdminNav";
 import api from "../../api";
 import { FiAlertTriangle, FiTruck } from "react-icons/fi";
 
@@ -26,9 +25,8 @@ export default function AdminExpiring() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <AdminNav />
-
+    <div className="bg-gray-100">
+      
       <div className="max-w-6xl mx-auto px-6 py-10">
         <h1 className="text-3xl font-bold text-red-600 flex items-center gap-2 mb-6">
           <FiAlertTriangle />

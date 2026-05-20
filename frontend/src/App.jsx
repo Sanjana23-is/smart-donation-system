@@ -9,7 +9,8 @@ import { io } from "socket.io-client";
 import { Snackbar, Alert } from "@mui/material";
 
 // ------------------- USER COMPONENTS -------------------
-import Nav from "./components/Nav";
+import UserSidebar from "./components/UserSidebar";
+import UserTopNav from "./components/UserTopNav";
 import Dashboard from "./pages/Dashboard";
 import Donors from "./pages/Donors";
 import Donations from "./pages/Donations";
@@ -22,6 +23,8 @@ import Tracking from "./pages/Tracking";
 import ItemDonation from "./pages/ItemDonation";
 import Notifications from "./pages/Notifications";
 import ExpiringItems from "./pages/Admin/ExpiringItems";
+import UserProfile from "./pages/UserProfile";
+import UserSettings from "./pages/UserSettings";
 
 // ------------------- AUTH -------------------
 import UserLogin from "./pages/Auth/UserLogin";
@@ -37,6 +40,11 @@ import AdminOrphanages from "./pages/Admin/AdminOrphanages";
 import AdminDisasters from "./pages/Admin/AdminDisasters";
 import AdminInventories from "./pages/Admin/AdminInventories";
 import AdminRedirect from "./pages/Admin/AdminRedirect";
+import AdminProfile from "./pages/Admin/AdminProfile";
+import AdminSettings from "./pages/Admin/AdminSettings";
+
+// ------------------- LAYOUTS -------------------
+import AdminLayout from "./layouts/AdminLayout";
 
 // ------------------- CONTEXT + PROTECTION -------------------
 import { AuthProvider, AuthContext } from "./context/AuthContext";
@@ -111,6 +119,12 @@ export default function App() {
       case "Track":
         return <Tracking />;
 
+      case "Profile":
+        return <UserProfile />;
+
+      case "Settings":
+        return <UserSettings />;
+
       default:
         return <Dashboard />;
     }
@@ -132,10 +146,15 @@ export default function App() {
               path="/dashboard"
               element={
                 <ProtectedRoute role="user">
-                  <div className="min-h-screen">
-                    <Nav current={current} setCurrent={setCurrent} />
-                    <div className="max-w-6xl mx-auto p-6">
-                      {renderUserPages()}
+                  <div className="flex h-screen overflow-hidden bg-gray-50">
+                    <UserSidebar current={current} setCurrent={setCurrent} />
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                      <UserTopNav current={current} setCurrent={setCurrent} />
+                      <main className="flex-1 overflow-y-auto p-6">
+                        <div className="max-w-6xl mx-auto">
+                          {renderUserPages()}
+                        </div>
+                      </main>
                     </div>
                   </div>
                 </ProtectedRoute>
@@ -162,79 +181,73 @@ export default function App() {
               }
             />
 
-            {/* ---------------- ADMIN DASHBOARD ---------------- */}
-            <Route
-              path="/admin/dashboard"
-              element={
-                <ProtectedRoute role="admin">
-                  <AdminDashboard />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* ---------------- ADMIN ROUTES ---------------- */}
-            <Route
-              path="/admin/requests"
-              element={
-                <ProtectedRoute role="admin">
-                  <AdminRequests />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/admin/products"
-              element={
-                <ProtectedRoute role="admin">
-                  <AdminProducts />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/admin/donations"
-              element={
-                <ProtectedRoute role="admin">
-                  <AdminDonations />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/admin/expiring"
-              element={<ExpiringItems />}
-            />
-
-            <Route
-              path="/admin/orphanages"
-              element={
-                <ProtectedRoute role="admin">
-                  <AdminOrphanages />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route path="/admin" element={<Navigate to="/admin/dashboard" />} />
-
-            <Route
-              path="/admin/disasters"
-              element={
-                <ProtectedRoute role="admin">
-                  <AdminDisasters />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/admin/inventories"
-              element={
-                <ProtectedRoute role="admin">
-                  <AdminInventories />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route path="/admin/redirect" element={<AdminRedirect />} />
+            {/* ---------------- ADMIN DASHBOARD (WRAPPED IN LAYOUT) ---------------- */}
+            <Route element={<AdminLayout />}>
+              <Route path="/admin" element={<Navigate to="/admin/dashboard" />} />
+              <Route
+                path="/admin/dashboard"
+                element={
+                  <ProtectedRoute role="admin">
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/requests"
+                element={
+                  <ProtectedRoute role="admin">
+                    <AdminRequests />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/products"
+                element={
+                  <ProtectedRoute role="admin">
+                    <AdminProducts />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/donations"
+                element={
+                  <ProtectedRoute role="admin">
+                    <AdminDonations />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/expiring"
+                element={<ExpiringItems />}
+              />
+              <Route
+                path="/admin/orphanages"
+                element={
+                  <ProtectedRoute role="admin">
+                    <AdminOrphanages />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/disasters"
+                element={
+                  <ProtectedRoute role="admin">
+                    <AdminDisasters />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/inventories"
+                element={
+                  <ProtectedRoute role="admin">
+                    <AdminInventories />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="/admin/redirect" element={<AdminRedirect />} />
+              <Route path="/admin/profile" element={<AdminProfile />} />
+              <Route path="/admin/settings" element={<AdminSettings />} />
+            </Route>
 
             {/* ---------------- DEFAULT ROUTE ---------------- */}
             <Route path="*" element={<Navigate to="/user/login" />} />

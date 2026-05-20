@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import api from "../../api";
-import AdminNav from "./AdminNav";
 import {
   FiSend,
   FiTruck,
@@ -219,9 +218,8 @@ export default function AdminRedirect() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <AdminNav />
-
+    <div className="bg-gray-100">
+      
       <div className="max-w-6xl mx-auto px-6 py-10">
         <h1 className="text-4xl font-bold text-center mb-10 flex items-center justify-center gap-3">
           <FiTruck className="text-blue-600" /> Redirect Inventory

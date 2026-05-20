@@ -110,7 +110,7 @@ export default function AdminProducts() {
      RENDER
   ================================ */
   return (
-    <div className="min-h-screen p-6 bg-gray-100">
+    <div className="p-6 bg-gray-100">
       <h2 className="text-2xl font-bold mb-6">🤖 AI Product Review Panel</h2>
 
       {isLoading ? (

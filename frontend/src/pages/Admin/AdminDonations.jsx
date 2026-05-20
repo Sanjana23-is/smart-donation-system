@@ -123,7 +123,7 @@ export default function AdminDonations() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 p-8">
+    <div className="bg-gradient-to-br from-gray-100 to-gray-200 p-8">
       <h1 className="text-3xl font-bold text-gray-800 mb-6">
         💰 Manage Donations
       </h1>

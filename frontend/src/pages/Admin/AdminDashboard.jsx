@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-import AdminNav from "./AdminNav";
 import api from "../../api";
 import {
   FiUsers,
@@ -31,9 +30,8 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200">
-      <AdminNav />
-
+    <div className="bg-gradient-to-br from-gray-100 to-gray-200">
+      
       <div className="p-8 max-w-7xl mx-auto">
         {/* HEADER */}
         <div className="mb-8">

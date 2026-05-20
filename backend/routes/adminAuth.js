@@ -39,4 +39,34 @@ router.post("/login", async (req, res) => {
   }
 });
 
+// Update Password
+router.put("/password", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, "SECRET_KEY_ADMIN");
+    const adminId = decoded.id;
+
+    const { currentPassword, newPassword } = req.body;
+
+    // verify current password
+    const [rows] = await db.query("SELECT * FROM admin_users WHERE adminId = ? AND password = ?", [adminId, currentPassword]);
+    
+    if (rows.length === 0) {
+      return res.status(400).json({ error: "Incorrect current password" });
+    }
+
+    // update password
+    await db.query("UPDATE admin_users SET password = ? WHERE adminId = ?", [newPassword, adminId]);
+
+    res.json({ message: "Password updated successfully" });
+
+  } catch (err) {
+    console.error("Admin password update error:", err);
+    res.status(500).json({ error: "Server error or invalid token" });
+  }
+});
+
 module.exports = router;
