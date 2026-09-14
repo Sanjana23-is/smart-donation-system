@@ -1,9 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const adminAuth = require("../middleware/adminAuth");
 
 // ➕ Add a disaster (Admin)
-router.post("/", async (req, res) => {
+router.post("/", adminAuth, async (req, res) => {
   try {
     const { disasterType, location, date } = req.body;
 
@@ -38,7 +39,7 @@ router.get("/", async (req, res) => {
 
 
 // ✔ Admin updates status → active / resolved
-router.put("/:id/status", async (req, res) => {
+router.put("/:id/status", adminAuth, async (req, res) => {
   try {
     const { status } = req.body;
 

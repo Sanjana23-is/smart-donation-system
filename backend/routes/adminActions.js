@@ -2,11 +2,12 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const { sendNotificationEmail } = require("../utils/emailService");
+const adminAuth = require("../middleware/adminAuth");
 
 /* ===============================
    GET PENDING PRODUCTS (PAGINATED)
 ================================ */
-router.get("/pending-products", async (req, res) => {
+router.get("/pending-products", adminAuth, async (req, res) => {
   try {
     const page  = Math.max(1, parseInt(req.query.page  || "1"));
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit || "10")));
@@ -35,7 +36,7 @@ router.get("/pending-products", async (req, res) => {
    APPROVE / REJECT PRODUCT
    (USES productId — NOT uid)
 ================================ */
-router.put("/product/:id/decision", async (req, res) => {
+router.put("/product/:id/decision", adminAuth, async (req, res) => {
   const productId = Number(req.params.id);
   const { decision, adminRemark } = req.body;
 
@@ -270,7 +271,7 @@ async function sendDecisionNotification({ donorId, productName, decision, adminR
 /* ===============================
    APPROVE / REJECT MONEY DONATION
 ================================ */
-router.put("/donation/:id/decision", async (req, res) => {
+router.put("/donation/:id/decision", adminAuth, async (req, res) => {
   const donationId = Number(req.params.id);
   const { decision } = req.body;
 

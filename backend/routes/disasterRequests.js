@@ -2,6 +2,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const adminAuth = require("../middleware/adminAuth");
 
 // Generate UID for disaster request
 function generateUID() {
@@ -57,7 +58,7 @@ router.post("/", async (req, res) => {
 });
 
 // APPROVE → move to inventory
-router.put("/:id/approve", async (req, res) => {
+router.put("/:id/approve", adminAuth, async (req, res) => {
   try {
     const id = req.params.id;
 
@@ -96,7 +97,7 @@ router.put("/:id/approve", async (req, res) => {
 });
 
 // REJECT
-router.put("/:id/reject", async (req, res) => {
+router.put("/:id/reject", adminAuth, async (req, res) => {
   try {
     await db.query(
       "UPDATE disasterrequests SET fulfilled = 2, status='rejected' WHERE requestId=?",

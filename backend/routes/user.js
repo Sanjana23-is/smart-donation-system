@@ -2,26 +2,10 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 
-// Middleware to verify JWT token (already exists in other routes, we'll inline a simple one or just assume auth happens if we had a global one. Since there's no global auth middleware exported in auth.js, let's write a quick one here or just trust the userId sent by frontend for now, since it's a mock/demo app. Actually, I should use the token.)
-const jwt = require("jsonwebtoken");
-const JWT_SECRET = process.env.JWT_SECRET || "your_secret_key";
-
-const authenticate = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: "No token provided" });
-  
-  const token = authHeader.split(" ")[1];
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (err) {
-    res.status(401).json({ error: "Invalid token" });
-  }
-};
+const userAuth = require("../middleware/userAuth");
 
 // GET /api/user/profile
-router.get("/profile", authenticate, async (req, res) => {
+router.get("/profile", userAuth, async (req, res) => {
   try {
     const userId = req.user.userId;
     console.log("Fetching profile for userId:", userId);
@@ -69,7 +53,7 @@ router.get("/profile", authenticate, async (req, res) => {
 });
 
 // PUT /api/user/profile
-router.put("/profile", authenticate, async (req, res) => {
+router.put("/profile", userAuth, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { phone, address, donations_anonymous, notifications_enabled } = req.body;

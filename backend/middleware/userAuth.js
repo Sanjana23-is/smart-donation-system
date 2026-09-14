@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const { JWT_SECRET } = require("../config/jwt");
 
 module.exports = function (req, res, next) {
     const authHeader = req.headers.authorization;
@@ -9,10 +10,10 @@ module.exports = function (req, res, next) {
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || "donation_secret_key");
+        const decoded = jwt.verify(token, JWT_SECRET);
         req.user = decoded;
         next();
     } catch (ex) {
-        res.status(400).json({ error: "Invalid token." });
+        res.status(401).json({ error: "Invalid or expired token." });
     }
 };

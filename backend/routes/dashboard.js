@@ -1,8 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const adminAuth = require("../middleware/adminAuth");
 
-router.get("/", async (req, res) => {
+router.get("/", adminAuth, async (req, res) => {
   try {
     // 1️⃣ Total donors
     const [[donors]] = await db.query(
@@ -35,9 +36,8 @@ router.get("/", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-module.exports = router;
 
-router.get("/charts", async (req, res) => {
+router.get("/charts", adminAuth, async (req, res) => {
   try {
     // 1️⃣ Donation Trends (Last 7 days, products only for simplicity)
     const [trends] = await db.query(`
@@ -61,3 +61,5 @@ router.get("/charts", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+module.exports = router;

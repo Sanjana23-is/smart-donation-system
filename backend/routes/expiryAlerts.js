@@ -1,9 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const adminAuth = require("../middleware/adminAuth");
 
 // GET all perishable items that will expire within 30 days
-router.get("/", async (req, res) => {
+router.get("/", adminAuth, async (req, res) => {
   try {
     const [rows] = await db.query(
       `

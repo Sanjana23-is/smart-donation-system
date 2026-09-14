@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const { JWT_SECRET } = require("../config/jwt");
 
 function adminAuth(req, res, next) {
   const authHeader = req.headers.authorization || "";
@@ -11,7 +12,7 @@ function adminAuth(req, res, next) {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET);
 
     // Ensure token belongs to an admin
     if (!decoded.adminId) {

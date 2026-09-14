@@ -2,10 +2,11 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const adminAuth = require("../middleware/adminAuth");
 
 // GET ALL INVENTORIES
 // GET ALL INVENTORIES
-router.get("/", async (req, res) => {
+router.get("/", adminAuth, async (req, res) => {
   try {
     const [rows] = await db.query(`
       SELECT 

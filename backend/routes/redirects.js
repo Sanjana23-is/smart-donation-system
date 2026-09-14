@@ -1,12 +1,13 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const adminAuth = require("../middleware/adminAuth");
 
 /* ------------------------------------------------------
    1) CREATE FIRST REDIRECT ENTRY
    Called from: POST /api/redirect  (AdminRedirect → saveRedirect)
 ------------------------------------------------------- */
-router.post("/", async (req, res) => {
+router.post("/", adminAuth, async (req, res) => {
   try {
     const {
       inventoryId,
@@ -60,7 +61,7 @@ router.post("/", async (req, res) => {
    2) LIST LATEST STATUS PER UID FOR ADMIN TABLE
    Called from: GET /api/redirect/history/all  (AdminRedirect initial load)
 ------------------------------------------------------- */
-router.get("/history/all", async (req, res) => {
+router.get("/history/all", adminAuth, async (req, res) => {
   try {
     // Get latest trackId per UID
     const [rows] = await db.query(
@@ -120,7 +121,7 @@ router.get("/:uid", async (req, res) => {
    NOTE: there is no 'location' column in table,
          so we append it into remarks.
 ------------------------------------------------------- */
-router.post("/:uid/markdelivered", async (req, res) => {
+router.post("/:uid/markdelivered", adminAuth, async (req, res) => {
   try {
     const uid = req.params.uid;
     const { deliveredDate, location, remarks } = req.body;
@@ -170,7 +171,7 @@ router.post("/:uid/markdelivered", async (req, res) => {
    5) EDIT LATEST ENTRY (inline edit in table)
    Called from: PUT /api/redirect/:uid/update
 ------------------------------------------------------- */
-router.put("/:uid/update", async (req, res) => {
+router.put("/:uid/update", adminAuth, async (req, res) => {
   try {
     const uid = req.params.uid;
     const { status, location, remarks } = req.body;
@@ -216,7 +217,7 @@ router.put("/:uid/update", async (req, res) => {
    6) ADD A NEW TIMELINE ENTRY (manual update)
    Called from: POST /api/redirect/:uid/addupdate
 ------------------------------------------------------- */
-router.post("/:uid/addupdate", async (req, res) => {
+router.post("/:uid/addupdate", adminAuth, async (req, res) => {
   try {
     const uid = req.params.uid;
     const { status, location, remarks } = req.body;

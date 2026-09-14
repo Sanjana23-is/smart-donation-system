@@ -5,7 +5,7 @@ const jwt = require("jsonwebtoken");
 const db = require("../db");
 const nodemailer = require("nodemailer");
 
-const JWT_SECRET = process.env.JWT_SECRET || "donation_secret_key";
+const { JWT_SECRET } = require("../config/jwt");
 
 // Nodemailer config
 const transporter = nodemailer.createTransport({

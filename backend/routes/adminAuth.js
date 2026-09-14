@@ -2,14 +2,17 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+const { JWT_SECRET } = require("../config/jwt");
 
 router.post("/login", async (req, res) => {
   const { username, password } = req.body;
 
   try {
+    // Fetch admin by username only — never compare password in SQL
     const [rows] = await db.query(
-      "SELECT * FROM admin_users WHERE username = ? AND password = ?",
-      [username, password]
+      "SELECT * FROM admin_users WHERE username = ?",
+      [username]
     );
 
     if (rows.length === 0) {
@@ -18,10 +21,16 @@ router.post("/login", async (req, res) => {
 
     const admin = rows[0];
 
+    // ✅ bcrypt comparison against hashed password
+    const isMatch = await bcrypt.compare(password, admin.password);
+    if (!isMatch) {
+      return res.status(401).json({ error: "Invalid admin credentials" });
+    }
+
     // ✅ generate token
     const token = jwt.sign(
-      { id: admin.adminId, username: admin.username, role: "admin" },
-      "SECRET_KEY_ADMIN",
+      { adminId: admin.adminId, id: admin.adminId, username: admin.username, role: "admin" },
+      JWT_SECRET,
       { expiresIn: "1d" }
     );
 
@@ -46,20 +55,27 @@ router.put("/password", async (req, res) => {
     if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
 
     const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, "SECRET_KEY_ADMIN");
-    const adminId = decoded.id;
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const adminId = decoded.adminId;
 
     const { currentPassword, newPassword } = req.body;
 
-    // verify current password
-    const [rows] = await db.query("SELECT * FROM admin_users WHERE adminId = ? AND password = ?", [adminId, currentPassword]);
-    
+    // Fetch admin to verify current password via bcrypt
+    const [rows] = await db.query("SELECT * FROM admin_users WHERE adminId = ?", [adminId]);
+
     if (rows.length === 0) {
+      return res.status(404).json({ error: "Admin not found" });
+    }
+
+    // ✅ bcrypt comparison
+    const isMatch = await bcrypt.compare(currentPassword, rows[0].password);
+    if (!isMatch) {
       return res.status(400).json({ error: "Incorrect current password" });
     }
 
-    // update password
-    await db.query("UPDATE admin_users SET password = ? WHERE adminId = ?", [newPassword, adminId]);
+    // ✅ hash new password before storing
+    const hashedNew = await bcrypt.hash(newPassword, 12);
+    await db.query("UPDATE admin_users SET password = ? WHERE adminId = ?", [hashedNew, adminId]);
 
     res.json({ message: "Password updated successfully" });
 
@@ -70,3 +86,4 @@ router.put("/password", async (req, res) => {
 });
 
 module.exports = router;
+

@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const adminAuth = require("../middleware/adminAuth");
 
 function generateUID() {
   return "DON-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
@@ -51,7 +52,7 @@ router.post("/", async (req, res) => {
 });
 
 // GET DONATIONS
-router.get("/", async (req, res) => {
+router.get("/", adminAuth, async (req, res) => {
   try {
     const [rows] = await db.query(`
       SELECT 
