@@ -3,14 +3,38 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const adminAuth = require("../middleware/adminAuth");
+const userAuth = require("../middleware/userAuth");
 
 // Generate UID for disaster request
 function generateUID() {
   return "DR-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
 }
 
-// GET all disaster requests
-router.get("/", async (req, res) => {
+// GET disaster requests for logged-in user
+router.get("/", userAuth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    if (!userId) {
+      return res.status(403).json({ error: "User ID not found in token" });
+    }
+
+    const [rows] = await db.query(
+      `SELECT dr.*, d.disasterType AS disasterName
+       FROM disasterrequests dr
+       LEFT JOIN disasters d ON dr.disasterId = d.disasterId
+       WHERE dr.userId = ?
+       ORDER BY dr.requestId DESC`,
+      [userId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("❌ ERROR GETTING USER REQUESTS:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET all disaster requests (Admin only)
+router.get("/admin", adminAuth, async (req, res) => {
   try {
     const [rows] = await db.query(`
       SELECT dr.*, d.disasterType AS disasterName
@@ -20,13 +44,13 @@ router.get("/", async (req, res) => {
     `);
     res.json(rows);
   } catch (err) {
-    console.error("❌ ERROR GETTING REQUESTS:", err);
+    console.error("❌ ERROR GETTING ADMIN REQUESTS:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // SUBMIT new request (user)
-router.post("/", async (req, res) => {
+router.post("/", userAuth, async (req, res) => {
   try {
     const { disasterId, requestedItem, quantity, unit } = req.body;
 
@@ -34,14 +58,19 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "All fields are required" });
     }
 
+    const userId = req.user.userId;
+    if (!userId) {
+      return res.status(403).json({ error: "User ID not found in token" });
+    }
+
     const uid = generateUID();
     const barcode = uid; // same for scanning later
 
     const [result] = await db.query(
       `INSERT INTO disasterrequests 
-       (disasterId, requestedItem, quantity, unit, fulfilled, status, uid, barcode)
-       VALUES (?, ?, ?, ?, 0, 'pending', ?, ?)`,
-      [disasterId, requestedItem, quantity, unit, uid, barcode]
+       (userId, disasterId, requestedItem, quantity, unit, fulfilled, status, uid, barcode)
+       VALUES (?, ?, ?, ?, ?, 0, 'pending', ?, ?)`,
+      [userId, disasterId, requestedItem, quantity, unit, uid, barcode]
     );
 
     res.status(201).json({

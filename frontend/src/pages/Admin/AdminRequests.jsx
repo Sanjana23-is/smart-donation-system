@@ -16,7 +16,7 @@ export default function AdminRequests() {
 
   async function load() {
     try {
-      const res = await api.get("/disaster-requests");
+      const res = await api.get("/disaster-requests/admin");
       setRows(res.data);
     } catch (err) {
       console.error("Error loading requests:", err);

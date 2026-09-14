@@ -59,6 +59,7 @@ DROP TABLE IF EXISTS `disasterrequests`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `disasterrequests` (
   `requestId` int NOT NULL AUTO_INCREMENT,
+  `userId` int DEFAULT NULL,
   `disasterId` int DEFAULT NULL,
   `requestedItem` varchar(255) DEFAULT NULL,
   `quantity` int DEFAULT NULL,
@@ -70,7 +71,9 @@ CREATE TABLE `disasterrequests` (
   PRIMARY KEY (`requestId`),
   UNIQUE KEY `uid` (`uid`),
   KEY `disasterId` (`disasterId`),
-  CONSTRAINT `disasterrequests_ibfk_1` FOREIGN KEY (`disasterId`) REFERENCES `disasters` (`disasterId`) ON DELETE CASCADE
+  KEY `idx_disasterrequests_userId` (`userId`),
+  CONSTRAINT `disasterrequests_ibfk_1` FOREIGN KEY (`disasterId`) REFERENCES `disasters` (`disasterId`) ON DELETE CASCADE,
+  CONSTRAINT `fk_disasterrequests_userId` FOREIGN KEY (`userId`) REFERENCES `users` (`userId`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
