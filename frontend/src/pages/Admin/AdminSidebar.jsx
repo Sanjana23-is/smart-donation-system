@@ -18,7 +18,7 @@ export default function AdminSidebar() {
       <div className="p-6 border-b border-white/10">
         <h2 className="text-xl font-bold text-white tracking-wider uppercase text-sm">System Mgmt</h2>
       </div>
-      
+
       <div className="flex-1 overflow-y-auto py-4">
         <nav className="space-y-2 px-3">
           {items.map((item) => {
@@ -27,11 +27,10 @@ export default function AdminSidebar() {
               <Link
                 key={item.to}
                 to={item.to}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
-                  active
-                    ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
-                    : "hover:bg-white/5 hover:text-white"
-                }`}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition-colors duration-150 ${active
+                  ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                  : "hover:bg-white/5 hover:text-white"
+                  }`}
               >
                 <span className={`text-lg ${active ? "text-blue-400" : "text-gray-500"}`}>
                   {item.icon}
