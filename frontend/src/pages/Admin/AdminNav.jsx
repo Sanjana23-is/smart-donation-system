@@ -1,10 +1,12 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useContext } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FiLogOut, FiUser, FiSettings, FiBell } from "react-icons/fi";
+import { AuthContext } from "../../context/AuthContext";
 
 export default function AdminNav() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { logout } = useContext(AuthContext);
   const [profileOpen, setProfileOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -16,7 +18,7 @@ export default function AdminNav() {
   ];
 
   function handleLogout() {
-    localStorage.removeItem("adminToken");
+    logout();
     navigate("/admin/login");
   }
 

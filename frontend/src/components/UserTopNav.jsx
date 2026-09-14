@@ -1,9 +1,13 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useContext } from "react";
+import { useNavigate } from "react-router-dom";
 import { FiUser, FiLogOut, FiSettings, FiBell } from "react-icons/fi";
+import { AuthContext } from "../context/AuthContext";
 
 export default function UserTopNav({ current, setCurrent }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const { logout } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   const topItems = [
     { id: "Dashboard", label: "Dashboard" },
@@ -13,8 +17,8 @@ export default function UserTopNav({ current, setCurrent }) {
   ];
 
   function handleLogout() {
-    localStorage.clear();
-    window.location.href = "/login";
+    logout();
+    navigate("/user/login");
   }
 
   // Close dropdown when clicking outside
