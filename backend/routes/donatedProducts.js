@@ -2,29 +2,11 @@
 const express = require("express");
 const router = express.Router(); // ✅ REQUIRED
 const db = require("../db");
-const multer = require("multer");
-const fs = require("fs");
 const path = require("path");
 const { analyzeProduct } = require("../services/aiService");
 const parseImages = require("../utils/imageParser");
-const userAuth = require("../middleware/userAuth"); // ✅ IMPORT AUTH MIDDLEWARE
-
-/* ===============================
-   UPLOAD CONFIG (MULTER)
-================================ */
-const uploadDir = path.join(__dirname, "../uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
-}
-
-const storage = multer.diskStorage({
-  destination: uploadDir,
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + file.originalname);
-  },
-});
-
-const upload = multer({ storage }); // ✅ THIS WAS MISSING
+const userAuth = require("../middleware/userAuth");
+const upload = require("../middleware/upload");
 
 /* ===============================
    GET PRODUCTS
@@ -65,6 +47,10 @@ router.post("/", userAuth, upload.array("item_images", 3), async (req, res) => {
 
     if (!productName || !category || !quantity || !unit) {
       return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: "At least one product image is required" });
     }
 
     const isPerishable =
@@ -115,7 +101,7 @@ router.post("/", userAuth, upload.array("item_images", 3), async (req, res) => {
         manufactureDate || null,
         expiryDate || null,
         JSON.stringify(
-          req.files.map((f) => "uploads/" + path.basename(f.path))
+          (req.files || []).map((f) => "uploads/" + path.basename(f.path))
         ),
         uid,
         "pending",
