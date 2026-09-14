@@ -176,7 +176,9 @@ CREATE TABLE `donors` (
   `address` text,
   `createdAt` datetime DEFAULT CURRENT_TIMESTAMP,
   `userId` int DEFAULT NULL,
-  PRIMARY KEY (`donorId`)
+  PRIMARY KEY (`donorId`),
+  KEY `idx_donors_userId` (`userId`),
+  CONSTRAINT `fk_donors_userId` FOREIGN KEY (`userId`) REFERENCES `users` (`userId`) ON DELETE SET NULL
 ) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
