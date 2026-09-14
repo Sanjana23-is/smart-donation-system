@@ -20,7 +20,6 @@ import Orphanages from "./pages/Orphanages";
 import QRPage from "./pages/QRPage";
 import DisasterRequestForm from "./pages/DisasterRequestForm";
 import Tracking from "./pages/Tracking";
-import ItemDonation from "./pages/ItemDonation";
 import Notifications from "./pages/Notifications";
 import ExpiringItems from "./pages/Admin/ExpiringItems";
 import UserProfile from "./pages/UserProfile";
@@ -58,15 +57,15 @@ function SocketWrapper({ children }) {
   useEffect(() => {
     // Attempt to load user from localStorage if context isn't set yet
     const storedUser = user || JSON.parse(localStorage.getItem('user'));
-    
+
     if (storedUser?.userId) {
       const socket = io("http://localhost:3000");
       socket.emit("join", storedUser.userId);
 
       socket.on("decision_update", (data) => {
         setToast({
-           message: `Update: Your product "${data.productName}" was ${data.decision}!`,
-           type: data.decision === 'approved' ? 'success' : 'error'
+          message: `Update: Your product "${data.productName}" was ${data.decision}!`,
+          type: data.decision === 'approved' ? 'success' : 'error'
         });
       });
 
@@ -171,15 +170,6 @@ export default function App() {
               }
             />
 
-            {/* ---------------- USER ITEM DONATION PAGE ---------------- */}
-            <Route
-              path="/donate-items"
-              element={
-                <ProtectedRoute role="user">
-                  <ItemDonation />
-                </ProtectedRoute>
-              }
-            />
 
             {/* ---------------- ADMIN DASHBOARD (WRAPPED IN LAYOUT) ---------------- */}
             <Route element={<AdminLayout />}>
