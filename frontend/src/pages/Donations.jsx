@@ -3,6 +3,8 @@ import api from "../api";
 
 export default function Donations() {
   const [donations, setDonations] = useState([]);
+  const [userDonors, setUserDonors] = useState([]);
+  const [donorsLoading, setDonorsLoading] = useState(true);
   const [form, setForm] = useState({
     donorId: "",
     amount: "",
@@ -14,7 +16,24 @@ export default function Donations() {
 
   useEffect(() => {
     load();
+    loadDonors();
   }, []);
+
+  async function loadDonors() {
+    try {
+      setDonorsLoading(true);
+      const res = await api.get("/donors");
+      const list = res.data || [];
+      setUserDonors(list);
+      if (list.length === 1) {
+        setForm((prev) => ({ ...prev, donorId: list[0].donorId }));
+      }
+    } catch (e) {
+      console.error("❌ Error loading user donors:", e);
+    } finally {
+      setDonorsLoading(false);
+    }
+  }
 
   async function load() {
     try {
@@ -29,6 +48,11 @@ export default function Donations() {
 
   async function submit(e) {
     e.preventDefault();
+    if (!form.donorId) {
+      alert("Please select a valid donor profile.");
+      return;
+    }
+
     try {
       await api.post("/donations", {
         donorId: form.donorId,
@@ -39,7 +63,7 @@ export default function Donations() {
       });
 
       setForm({
-        donorId: "",
+        donorId: userDonors.length === 1 ? userDonors[0].donorId : "",
         amount: "",
         method: "",
         paymentReference: "",
@@ -49,7 +73,7 @@ export default function Donations() {
       alert("Donation Submitted. Awaiting Admin Approval.");
     } catch (e) {
       console.error(e);
-      alert("Error adding donation");
+      alert(e.response?.data?.error || "Error adding donation");
     }
   }
 
@@ -62,21 +86,47 @@ export default function Donations() {
       {/* FORM */}
       <div className="max-w-5xl mx-auto bg-white p-6 rounded-2xl shadow-xl mb-10">
         <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <input
-            placeholder="Donor ID"
-            value={form.donorId}
-            onChange={(e) => setForm({ ...form, donorId: e.target.value })}
-            className="p-3 border rounded-lg shadow-sm"
-            required
-          />
+          {donorsLoading ? (
+            <div className="p-3 border rounded-lg bg-gray-50 text-gray-500">
+              Loading donor profile...
+            </div>
+          ) : userDonors.length === 0 ? (
+            <div className="p-3 border border-amber-300 bg-amber-50 rounded-lg text-amber-800 text-sm col-span-full">
+              ⚠️ You must create a donor profile before submitting a donation. Please visit the <b>Donors</b> page to register.
+            </div>
+          ) : userDonors.length === 1 ? (
+            <input
+              type="text"
+              readOnly
+              value={`Donor #${userDonors[0].donorId} (${userDonors[0].name})`}
+              className="p-3 border rounded-lg shadow-sm bg-gray-50 text-gray-700 cursor-not-allowed"
+            />
+          ) : (
+            <select
+              value={form.donorId}
+              onChange={(e) => setForm({ ...form, donorId: e.target.value })}
+              className="p-3 border rounded-lg shadow-sm"
+              required
+            >
+              <option value="">Select Donor Profile</option>
+              {userDonors.map((d) => (
+                <option key={d.donorId} value={d.donorId}>
+                  Donor #{d.donorId} — {d.name}
+                </option>
+              ))}
+            </select>
+          )}
 
           <input
             type="number"
+            min="1"
+            step="any"
             placeholder="Amount"
             value={form.amount}
             onChange={(e) => setForm({ ...form, amount: e.target.value })}
             className="p-3 border rounded-lg shadow-sm"
             required
+            disabled={userDonors.length === 0}
           />
 
           <select
@@ -84,6 +134,7 @@ export default function Donations() {
             onChange={(e) => setForm({ ...form, method: e.target.value })}
             className="p-3 border rounded-lg shadow-sm"
             required
+            disabled={userDonors.length === 0}
           >
             <option value="">Select Method</option>
             <option value="Cash">Cash</option>
@@ -121,7 +172,10 @@ export default function Donations() {
             </div>
           )}
 
-          <button className="col-span-full bg-green-600 text-white py-3 rounded-xl shadow hover:bg-green-700 transition">
+          <button
+            disabled={userDonors.length === 0}
+            className="col-span-full bg-green-600 text-white py-3 rounded-xl shadow hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             Submit Donation
           </button>
         </form>

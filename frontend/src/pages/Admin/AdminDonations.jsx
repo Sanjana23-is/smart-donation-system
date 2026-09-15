@@ -22,7 +22,7 @@ export default function AdminDonations() {
       setError(null);
 
       // ✅ IMPORTANT: admin should load from admin route (not user route)
-      const res = await api.get("/donations");
+      const res = await api.get("/donations/admin");
 
       console.log("✅ Donations API Response:", res.data);
 

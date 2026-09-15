@@ -293,24 +293,26 @@ router.put("/donation/:id/decision", adminAuth, async (req, res) => {
       return res.status(404).json({ error: "Donation not found" });
     }
 
-    // --- FETCH DONATION FOR NOTIFICATION ---
-    const [[donation]] = await db.query("SELECT * FROM donations WHERE donationId = ?", [donationId]);
+    // --- FETCH DONATION AND RESOLVE OWNER FOR NOTIFICATION ---
+    const [[donation]] = await db.query(
+      `SELECT dn.*, d.userId AS ownerUserId 
+       FROM donations dn 
+       LEFT JOIN donors d ON dn.donorId = d.donorId 
+       WHERE dn.donationId = ?`,
+      [donationId]
+    );
 
-    if (donation) {
-      // Prioritize userId (if we added it to donations table) or fallback for now.
-      // Money donation notifications might still rely on donorId if schema wasn't updated there,
-      // but assuming consistency across the app.
-      const targetUserId = donation.userId || donation.donorId;
-
-      console.log(`🔍 MONEY DONATION CHECK: userId=[${donation.userId}] donorId=[${donation.donorId}]`);
-      console.log(`👉 TARGET NOTIFICATION USER ID: ${targetUserId}`);
+    if (donation && donation.ownerUserId) {
+      console.log(`🔍 MONEY DONATION: donationId=[${donationId}] resolved ownerUserId=[${donation.ownerUserId}]`);
 
       sendDecisionNotification({
-        donorId: targetUserId,
+        donorId: donation.ownerUserId,
         productName: `Money Donation (₹${donation.amount})`,
         decision,
         adminRemark: "Clean admin decision"
       }, req.app.locals.io);
+    } else if (donation) {
+      console.log(`ℹ️ Donation ${donationId} has no linked user account (legacy donor) - skipping notification`);
     }
 
     res.json({ message: `Donation ${decision}` });
