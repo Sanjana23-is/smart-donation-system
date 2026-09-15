@@ -22,17 +22,27 @@ router.get("/profile", userAuth, async (req, res) => {
 
     console.log("Found user:", users[0].email);
 
-    // Fetch total donations stats
+    // Fetch total donations stats belonging to the authenticated user's donors
     const [donations] = await db.query(
-      "SELECT COUNT(*) as count, SUM(amount) as total_money FROM donations WHERE donorId = ? AND status = 'approved'",
+      `SELECT COUNT(*) AS count, IFNULL(SUM(dn.amount), 0) AS total_money
+       FROM donations dn
+       INNER JOIN donors d ON dn.donorId = d.donorId
+       WHERE d.userId = ? AND dn.status = 'approved'`,
       [userId]
     );
 
     console.log("Donations stats:", donations[0]);
 
+    // Fetch total product items belonging to the authenticated user (direct or legacy via owned donor)
     const [products] = await db.query(
-      "SELECT SUM(quantity) as total_items FROM donatedProducts WHERE donorId = ? AND status = 'approved'",
-      [userId]
+      `SELECT IFNULL(SUM(dp.quantity), 0) AS total_items
+       FROM donatedProducts dp
+       WHERE dp.status = 'approved'
+         AND (
+           dp.userId = ?
+           OR dp.donorId IN (SELECT donorId FROM donors WHERE userId = ?)
+         )`,
+      [userId, userId]
     );
 
     console.log("Products stats:", products[0]);
@@ -40,9 +50,9 @@ router.get("/profile", userAuth, async (req, res) => {
     res.json({
       user: users[0],
       stats: {
-        monetaryCount: donations[0].count || 0,
-        totalMoney: donations[0].total_money || 0,
-        totalItems: products[0].total_items || 0
+        monetaryCount: Number(donations[0].count) || 0,
+        totalMoney: Number(donations[0].total_money) || 0,
+        totalItems: Number(products[0].total_items) || 0
       }
     });
 
