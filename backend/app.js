@@ -51,7 +51,6 @@ app.use("/api/donations", require("./routes/donations"));
 app.use("/api/donated-products", require("./routes/donatedProducts"));
 app.use("/api/admin/actions", require("./routes/adminActions"));
 app.use("/api/inventories", require("./routes/inventories"));
-app.use("/api/tracking", require("./routes/tracking"));
 app.use("/api/redirect", require("./routes/redirects"));
 app.use("/api/expiry-alerts", require("./routes/expiryAlerts"));
 app.use("/api/disasters", require("./routes/disasters"));
