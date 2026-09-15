@@ -1,17 +1,58 @@
-//backend/routes/donatedaProducts.js
+//backend/routes/donatedProducts.js
 const express = require("express");
-const router = express.Router(); // ✅ REQUIRED
+const router = express.Router();
 const db = require("../db");
 const path = require("path");
 const { analyzeProduct } = require("../services/aiService");
 const parseImages = require("../utils/imageParser");
 const userAuth = require("../middleware/userAuth");
+const adminAuth = require("../middleware/adminAuth");
 const upload = require("../middleware/upload");
 
 /* ===============================
-   GET PRODUCTS
+   GET USER PRODUCTS (OWNED ONLY)
 ================================ */
-router.get("/", async (req, res) => {
+router.get("/", userAuth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const [rows] = await db.query(
+      `SELECT DISTINCT
+         dp.productId,
+         dp.productName,
+         dp.category,
+         dp.quantity,
+         dp.unit,
+         dp.uid,
+         dp.status,
+         dp.donatedAt,
+         dp.perishable,
+         dp.manufactureDate,
+         dp.expiryDate,
+         dp.item_image
+       FROM donatedProducts dp
+       LEFT JOIN donors d ON dp.donorId = d.donorId
+       WHERE dp.userId = ? OR d.userId = ?
+       ORDER BY dp.donatedAt DESC`,
+      [userId, userId]
+    );
+
+    res.json(
+      rows.map((r) => ({
+        ...r,
+        item_image: parseImages(r.item_image),
+      }))
+    );
+  } catch (err) {
+    console.error("❌ FETCH PRODUCTS ERROR:", err);
+    res.status(500).json({ error: "Failed to fetch products" });
+  }
+});
+
+/* ===============================
+   GET ALL PRODUCTS (ADMIN ONLY)
+================================ */
+router.get("/admin", adminAuth, async (req, res) => {
   try {
     const [rows] = await db.query(
       "SELECT * FROM donatedProducts ORDER BY donatedAt DESC"
@@ -24,8 +65,8 @@ router.get("/", async (req, res) => {
       }))
     );
   } catch (err) {
-    console.error("❌ FETCH PRODUCTS ERROR:", err);
-    res.status(500).json({ error: err.message });
+    console.error("❌ ADMIN FETCH PRODUCTS ERROR:", err);
+    res.status(500).json({ error: "Failed to fetch all products" });
   }
 });
 
@@ -53,6 +94,28 @@ router.post("/", userAuth, upload.array("item_images", 3), async (req, res) => {
       return res.status(400).json({ error: "At least one product image is required" });
     }
 
+    const userId = req.user.userId;
+
+    // Verify donor ownership if donorId is supplied
+    let verifiedDonorId = null;
+    if (donorId !== undefined && donorId !== null && donorId !== "") {
+      const parsedDonorId = parseInt(donorId, 10);
+      if (isNaN(parsedDonorId)) {
+        return res.status(400).json({ error: "Invalid donorId" });
+      }
+
+      const [[donor]] = await db.query(
+        "SELECT donorId FROM donors WHERE donorId = ? AND userId = ?",
+        [parsedDonorId, userId]
+      );
+
+      if (!donor) {
+        return res.status(403).json({ error: "Access denied. You do not own this donor profile." });
+      }
+
+      verifiedDonorId = parsedDonorId;
+    }
+
     const isPerishable =
       perishable === "true" || perishable === true || perishable === "1";
 
@@ -75,15 +138,6 @@ router.post("/", userAuth, upload.array("item_images", 3), async (req, res) => {
 
     const aiReason = aiResult?.reason || "AI analysis completed";
 
-    // AUTHENTICATED USER ID
-    // We expect userAuth middleware to be used here. 
-    // If not, we will need to add it to the route definition.
-    // For now, let's assume if req.user exists we use it.
-    // However, the original code used `donorId` from body.
-    // We MUST prioritize req.user.userId if available.
-
-    const userId = req.user ? req.user.userId : null;
-
     await db.query(
       `INSERT INTO donatedProducts
       (donorId, userId, productName, category, quantity, unit, perishable,
@@ -91,8 +145,8 @@ router.post("/", userAuth, upload.array("item_images", 3), async (req, res) => {
        status, ai_status, ai_confidence, ai_reason)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        donorId || null,
-        userId, // ✅ STORING AUTHENTICATED USER ID
+        verifiedDonorId,
+        userId,
         productName,
         category.toLowerCase(),
         quantity,

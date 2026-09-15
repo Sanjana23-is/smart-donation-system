@@ -33,8 +33,13 @@ export default function Products() {
   }, []);
 
   async function load() {
-    const res = await api.get("/donated-products");
-    setProducts(res.data || []);
+    try {
+      const res = await api.get("/donated-products");
+      setProducts(res.data || []);
+    } catch (err) {
+      console.error("Failed to load products:", err);
+      setProducts([]);
+    }
   }
 
   async function submit(e) {
@@ -92,7 +97,8 @@ export default function Products() {
       load();
     } catch (err) {
       console.error(err);
-      alert("Error submitting product.");
+      const msg = err.response?.data?.error || "Error submitting product.";
+      alert(msg);
     }
   }
 
