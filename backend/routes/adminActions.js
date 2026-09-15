@@ -82,7 +82,7 @@ router.put("/product/:id/decision", adminAuth, async (req, res) => {
     );
 
     /* ---------- 3. HANDLE NOTIFICATIONS (Async/Indep) ---------- */
-    // 🚨 FIX: Strict Priority to userId
+    // Strict Priority to userId, then resolve through donors table for legacy products
     let targetUserId = product.userId;
 
     // Logging to debug ownership
@@ -91,28 +91,45 @@ router.put("/product/:id/decision", adminAuth, async (req, res) => {
     console.log(`   - Product Name: ${product.productName}`);
     console.log(`   - Data: userId=[${product.userId}] donorId=[${product.donorId}]`);
 
-    if (!targetUserId) {
-      console.warn("⚠️ WARNING: This product has NO 'userId' linked.");
-      console.warn("   -> Attempting fallback to 'donorId' (Legacy mode)");
-      targetUserId = product.donorId;
-    } else {
+    if (!targetUserId && product.donorId) {
+      console.log("ℹ️ Product has no direct userId, resolving owner via donors table...");
+      const [[donor]] = await connection.query(
+        "SELECT userId FROM donors WHERE donorId = ?",
+        [product.donorId]
+      );
+      if (donor && donor.userId) {
+        targetUserId = donor.userId;
+        console.log(`✅ Resolved User ID from donor profile: ${targetUserId}`);
+      } else {
+        console.warn(`⚠️ Donor ID ${product.donorId} has no linked user account (legacy donor)`);
+        targetUserId = null;
+      }
+    } else if (targetUserId) {
       console.log(`✅ Using Authenticated User ID: ${targetUserId}`);
+    } else {
+      console.warn("⚠️ WARNING: This product has neither userId nor donorId linked.");
     }
 
-    // Prepare notification data
-    const notificationData = {
-      donorId: targetUserId, // Passing resolved ID
-      productName: product.productName,
-      decision,
-      adminRemark
-    };
+    // Prepare notification data only if a valid user ID was resolved
+    const notificationData = targetUserId
+      ? {
+          donorId: targetUserId, // Passing resolved user ID
+          productName: product.productName,
+          decision,
+          adminRemark,
+        }
+      : null;
 
     /* ---------- 4. IF REJECTED - STOP HERE ---------- */
     if (decision === "rejected") {
       await connection.commit();
 
-      // Send Notification (Fire & Forget)
-      sendDecisionNotification(notificationData, req.app.locals.io);
+      // Send Notification (Fire & Forget) if owner resolved
+      if (notificationData) {
+        sendDecisionNotification(notificationData, req.app.locals.io);
+      } else {
+        console.log("ℹ️ Skipping notification: no linked user account found");
+      }
 
       return res.json({ message: "Product rejected by admin" });
     }
@@ -156,8 +173,12 @@ router.put("/product/:id/decision", adminAuth, async (req, res) => {
     // ✅ COMMIT TRANSACTION
     await connection.commit();
 
-    // Send Notification (Fire & Forget)
-    sendDecisionNotification(notificationData, req.app.locals.io);
+    // Send Notification (Fire & Forget) if owner resolved
+    if (notificationData) {
+      sendDecisionNotification(notificationData, req.app.locals.io);
+    } else {
+      console.log("ℹ️ Skipping notification: no linked user account found");
+    }
 
     res.json({
       message: "Product approved and moved to inventory",
