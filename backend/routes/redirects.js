@@ -8,51 +8,96 @@ const adminAuth = require("../middleware/adminAuth");
    Called from: POST /api/redirect  (AdminRedirect → saveRedirect)
 ------------------------------------------------------- */
 router.post("/", adminAuth, async (req, res) => {
-  try {
-    const {
-      inventoryId,
-      uid,
-      sourceType,
-      productName,
-      donationId,
-      disasterRequestId,
-      toType,
-      toName,
-      dispatchedBy,
-      dispatchDate,
-      remarks,
-    } = req.body;
+  const {
+    inventoryId,
+    uid,
+    sourceType,
+    productName,
+    donationId,
+    disasterRequestId,
+    toType,
+    toName,
+    dispatchedBy,
+    dispatchDate,
+    remarks,
+  } = req.body;
 
-    if (!inventoryId || !uid || !sourceType || !toType || !toName || !dispatchDate) {
-      return res.status(400).json({ error: "Missing required fields" });
+  if (!inventoryId || !uid || !sourceType || !toType || !toName || !dispatchDate) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  let connection;
+  try {
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    const [[inventory]] = await connection.query(
+      "SELECT * FROM inventories WHERE inventoryId = ? FOR UPDATE",
+      [inventoryId]
+    );
+
+    if (!inventory) {
+      await connection.rollback();
+      return res.status(404).json({ error: "Inventory item not found" });
     }
 
-    await db.query(
+    if (inventory.status !== "received") {
+      await connection.rollback();
+      return res.status(400).json({ error: "Inventory item is already dispatched or delivered" });
+    }
+
+    if (req.body.uid !== inventory.uid) {
+      await connection.rollback();
+      return res.status(400).json({ error: "Inventory UID does not match" });
+    }
+
+    // Authoritative metadata from the locked inventory row
+    const authoritativeUid = inventory.uid;
+    const authoritativeProductName =
+      inventory.productName ||
+      inventory.requestedItem ||
+      (inventory.sourceType === "donation" ? `Donation Amount: ${inventory.amount}` : null);
+    const authoritativeSourceType = inventory.sourceType;
+    const authoritativeDonationId = inventory.donationId;
+    const authoritativeDisasterRequestId = inventory.disasterRequestId;
+
+    await connection.query(
       `INSERT INTO trackinghistory
        (uid, inventoryId, sourceType, productName, donationId, disasterRequestId,
         fromLocation, toType, toName, dispatchedBy, dispatchDate, status, remarks)
        VALUES
        (?, ?, ?, ?, ?, ?, 'Main Warehouse', ?, ?, ?, ?, 'Dispatched', ?)`,
-       [
-         uid,
-         inventoryId,
-         sourceType,
-         productName || null,
-         donationId || null,
-         disasterRequestId || null,
-         toType,
-         toName,
-         dispatchedBy || "Admin",
-         dispatchDate,
-         remarks || null,
-       ]
+      [
+        authoritativeUid,
+        inventory.inventoryId,
+        authoritativeSourceType,
+        authoritativeProductName,
+        authoritativeDonationId,
+        authoritativeDisasterRequestId,
+        toType,
+        toName,
+        dispatchedBy || "Admin",
+        dispatchDate,
+        remarks || null,
+      ]
     );
 
+    await connection.query(
+      `UPDATE inventories
+       SET status = 'dispatched'
+       WHERE inventoryId = ?`,
+      [inventory.inventoryId]
+    );
+
+    await connection.commit();
     return res.json({ message: "Redirect saved successfully!" });
 
   } catch (err) {
+    if (connection) await connection.rollback();
     console.error("TRACKING CREATE ERROR:", err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: "Failed to save redirect" });
+  } finally {
+    if (connection) connection.release();
   }
 });
 
@@ -122,25 +167,48 @@ router.get("/:uid", async (req, res) => {
          so we append it into remarks.
 ------------------------------------------------------- */
 router.post("/:uid/markdelivered", adminAuth, async (req, res) => {
-  try {
-    const uid = req.params.uid;
-    const { deliveredDate, location, remarks } = req.body;
+  const uid = req.params.uid;
+  const { deliveredDate, location, remarks } = req.body;
 
-    if (!deliveredDate) {
-      return res.status(400).json({ error: "deliveredDate is required" });
+  if (!deliveredDate) {
+    return res.status(400).json({ error: "deliveredDate is required" });
+  }
+
+  let connection;
+  try {
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    const [[inventory]] = await connection.query(
+      "SELECT * FROM inventories WHERE uid = ? FOR UPDATE",
+      [uid]
+    );
+
+    if (!inventory) {
+      await connection.rollback();
+      return res.status(404).json({ error: "Inventory item not found" });
     }
 
-    // find latest record for this uid
-    const [latestRows] = await db.query(
+    if (inventory.status !== "dispatched") {
+      await connection.rollback();
+      return res.status(400).json({
+        error: "Inventory item is not currently dispatched",
+      });
+    }
+
+    // find latest record for this uid and lock it
+    const [latestRows] = await connection.query(
       `SELECT trackId, remarks
        FROM trackinghistory
        WHERE uid = ?
        ORDER BY trackId DESC
-       LIMIT 1`,
+       LIMIT 1
+       FOR UPDATE`,
       [uid]
     );
 
     if (!latestRows || latestRows.length === 0) {
+      await connection.rollback();
       return res.status(404).json({ error: "UID not found" });
     }
 
@@ -151,18 +219,29 @@ router.post("/:uid/markdelivered", adminAuth, async (req, res) => {
       (location ? `Location: ${location}. ` : "") +
       (remarks ?? latest.remarks ?? "");
 
-    await db.query(
+    await connection.query(
       `UPDATE trackinghistory
        SET deliveredDate = ?, status = 'Delivered', remarks = ?
        WHERE trackId = ?`,
       [deliveredDate, mergedRemarks || null, latest.trackId]
     );
 
+    await connection.query(
+      `UPDATE inventories
+       SET status = 'delivered'
+       WHERE inventoryId = ?`,
+      [inventory.inventoryId]
+    );
+
+    await connection.commit();
     return res.json({ message: "Marked as delivered" });
 
   } catch (err) {
+    if (connection) await connection.rollback();
     console.error("MARK DELIVERED ERROR:", err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: "Failed to mark as delivered" });
+  } finally {
+    if (connection) connection.release();
   }
 });
 
