@@ -57,9 +57,12 @@ function SocketWrapper({ children }) {
   useEffect(() => {
     // Attempt to load user from localStorage if context isn't set yet
     const storedUser = user || JSON.parse(localStorage.getItem('user'));
+    const token = localStorage.getItem("token");
 
-    if (storedUser?.userId) {
-      const socket = io("http://localhost:3000");
+    if (storedUser?.userId && token) {
+      const socket = io("http://localhost:3000", {
+        auth: { token }
+      });
       socket.emit("join", storedUser.userId);
 
       socket.on("decision_update", (data) => {

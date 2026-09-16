@@ -5,7 +5,10 @@ const dotenv = require("dotenv");
 const cors = require("cors");
 const path = require("path");
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, ".env") });
+
+const jwt = require("jsonwebtoken");
+const { JWT_SECRET } = require("./config/jwt");
 
 const app = express();
 const server = http.createServer(app);
@@ -18,14 +21,47 @@ const io = new Server(server, {
   },
 });
 
-io.on("connection", (socket) => {
-  console.log(`🔌 Socket connected: ${socket.id}`);
+// Socket.IO authentication middleware
+io.use((socket, next) => {
+  let token = socket.handshake.auth?.token;
+  if (!token && socket.handshake.headers?.authorization) {
+    const authHeader = socket.handshake.headers.authorization;
+    if (authHeader.startsWith("Bearer ")) {
+      token = authHeader.slice(7);
+    } else {
+      token = authHeader;
+    }
+  }
 
-  // Donor joins their personal room using userId
+  if (!token) {
+    return next(new Error("Authentication error: No token provided"));
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (!decoded.userId) {
+      return next(new Error("Authentication error: Valid user token required"));
+    }
+    socket.userId = decoded.userId;
+    next();
+  } catch (err) {
+    return next(new Error("Authentication error: Invalid or expired token"));
+  }
+});
+
+io.on("connection", (socket) => {
+  console.log(`🔌 Socket connected: ${socket.id} (User: ${socket.userId})`);
+
+  // Automatically join the user's personal room using verified socket.userId
+  socket.join(`user_${socket.userId}`);
+  console.log(`👤 User ${socket.userId} joined room user_${socket.userId}`);
+
+  // Compatibility join handler: only allow joining user's own room if userId matches
   socket.on("join", (userId) => {
-    if (userId) {
-      socket.join(`user_${userId}`);
-      console.log(`👤 User ${userId} joined room user_${userId}`);
+    if (userId && Number(userId) === Number(socket.userId)) {
+      socket.join(`user_${socket.userId}`);
+    } else if (userId) {
+      console.warn(`⚠️ Socket ${socket.id} attempted unauthorized join to user_${userId}`);
     }
   });
 
